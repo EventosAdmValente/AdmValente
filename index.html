@@ -81,11 +81,6 @@
   }
 }
 </script>
-    <link rel="manifest" href="./manifest.json">
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
-    <meta name="theme-color" content="#003366">
 </head>
 <body class="h-screen w-full flex flex-col">
 
@@ -452,7 +447,7 @@
                     // Prende o usuário empurrando o estado novamente
                     history.pushState({ screen: 'home' }, '', '');
                     
-                    showConfirmModal("Sair do App", "Deseja realmente sair da aplicação?", () => {
+                    showConfirmModal("Sair da Agenda", "Deseja sair da Agenda?", () => {
                         // Tenta voltar duas vezes para passar pelo 'trap' e sair
                         history.go(-2); 
                         // Fallback: Tenta fechar a janela
@@ -525,12 +520,12 @@
                                 <div class="grid grid-cols-2 gap-2 sm:gap-3">
                                     <div onclick="openDatePicker('filterStartDate')" class="flex items-center bg-white border border-slate-300 rounded-lg px-2 sm:px-3 py-1 shadow-sm focus-within:border-navy focus-within:ring-1 focus-within:ring-navy transition-all cursor-pointer relative">
                                         <span class="text-xs font-bold text-navy uppercase mr-1 sm:mr-2 min-w-[36px]">Início</span>
-                                        <input type="text" inputmode="numeric" placeholder="dd/mm/aa" maxlength="8" id="filterStart" class="flex-1 bg-transparent border-none p-1 text-sm text-slate-700 focus:ring-0 outline-none w-full min-w-0 font-medium placeholder:text-slate-400" onclick="event.stopPropagation()">
+                                        <input type="text" readonly placeholder="dd/mm/aa" id="filterStart" class="flex-1 bg-transparent border-none p-1 text-sm text-slate-700 focus:ring-0 outline-none w-full min-w-0 font-medium placeholder:text-slate-400 cursor-pointer">
                                         <i data-lucide="calendar" class="w-4 h-4 text-slate-400 ml-1"></i>
                                     </div>
                                     <div onclick="openDatePicker('filterEndDate')" class="flex items-center bg-white border border-slate-300 rounded-lg px-2 sm:px-3 py-1 shadow-sm focus-within:border-navy focus-within:ring-1 focus-within:ring-navy transition-all cursor-pointer relative">
                                         <span class="text-xs font-bold text-navy uppercase mr-1 sm:mr-2 min-w-[24px]">Fim</span>
-                                        <input type="text" inputmode="numeric" placeholder="dd/mm/aa" maxlength="8" id="filterEnd" class="flex-1 bg-transparent border-none p-1 text-sm text-slate-700 focus:ring-0 outline-none w-full min-w-0 font-medium placeholder:text-slate-400" onclick="event.stopPropagation()">
+                                        <input type="text" readonly placeholder="dd/mm/aa" id="filterEnd" class="flex-1 bg-transparent border-none p-1 text-sm text-slate-700 focus:ring-0 outline-none w-full min-w-0 font-medium placeholder:text-slate-400 cursor-pointer">
                                         <i data-lucide="calendar" class="w-4 h-4 text-slate-400 ml-1"></i>
                                     </div>
                                 </div>
@@ -548,49 +543,8 @@
                 
                 document.getElementById('homeSearch').addEventListener('input', (e) => { state.searchTerm = e.target.value; if(e.target.value) clearDateFilters(false); });
                 
-                // MASK & FILTER LOGIC
-                const handleDateInput = (e, key) => {
-                    let v = e.target.value.replace(/\D/g, '');
-                    if (v.length > 6) v = v.slice(0, 6);
-                    
-                    if (v.length > 4) {
-                        e.target.value = `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
-                    } else if (v.length > 2) {
-                        e.target.value = `${v.slice(0, 2)}/${v.slice(2)}`;
-                    } else {
-                        e.target.value = v;
-                    }
-                    
-                    const val = e.target.value;
-                    if (val.length === 8) { // dd/mm/yy
-                        const iso = parseDisplayDateToIso(val);
-                        state[key] = iso;
-                        if(key === 'filterStartDate') {
-                             if(iso) state.viewDate = new Date(iso + 'T00:00:00');
-                             if(!state.filterEndDate) state.filterEndDate = iso;
-                        }
-                        // Remover selecao unica ao digitar
-                        state.selectedDate = null;
-                        
-                        // IMPORTANTE: Atualizar a UI para refletir as mudancas no filtro
-                        renderApp();
-                    } else if (val === '') {
-                        state[key] = '';
-                        renderApp();
-                    }
-                };
-
-                // Adiciona listener de clique direto no input tambem para abrir calendario (opcional, mas solicitado)
-                const startInput = document.getElementById('filterStart');
-                const endInput = document.getElementById('filterEnd');
-
-                startInput.addEventListener('input', (e) => handleDateInput(e, 'filterStartDate'));
-                endInput.addEventListener('input', (e) => handleDateInput(e, 'filterEndDate'));
-                
-                // Se quiser que clique NO INPUT tambem abra, descomente:
-                startInput.addEventListener('click', () => openDatePicker('filterStartDate'));
-                endInput.addEventListener('click', () => openDatePicker('filterEndDate'));
-
+                // Os inputs agora sao readonly, entao nao precisamos de listener de input para mascara
+                // O clique eh propagado para a div pai que abre o calendario
             }
 
             // Sync UI
