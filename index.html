@@ -452,16 +452,11 @@
             } else {
                 // Se estamos na Home e o usuário tenta sair
                 if (state.currentScreen === 'home') {
-                            const sair = confirm("Deseja realmente sair da Agenda?");
+                    const sair = confirm("Deseja realmente sair da Agenda?");        
+                    
+                    showExitDialog();
+                    return;
                         
-                            if (sair) {
-                                history.go(-1); // Sai do app
-                            } else {
-                                // Impede saída e mantém na home
-                                history.pushState({ screen: 'home' }, "", "");
-                            }
-                        
-                            return;
                         }
                 else {
                     internalNavigateTo('home');
@@ -1039,7 +1034,63 @@
         };
         renderApp();
     </script>
+
+    // função para sair do app
     
+    function showExitDialog() {
+    const dialog = document.getElementById("exitDialog");
+    dialog.style.display = "flex";
+
+    document.getElementById("exitCancel").onclick = () => {
+        dialog.style.display = "none";
+        history.pushState({ screen: 'home' }, "", "");
+    };
+
+    document.getElementById("exitConfirm").onclick = () => {
+    dialog.style.display = "none";
+    history.go(-3); // Sai do app imediatamente
+};
+}
+
+    // Código de saída do App
+    
+   <div id="exitDialog" style="
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+">
+    <div style="
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        width: 80%;
+        max-width: 300px;
+        text-align: center;
+        font-size: 18px;
+    ">
+        <p style="margin-bottom: 20px;">Deseja realmente sair da Agenda?</p>
+
+        <button id="exitCancel" style="
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #bdbdbd;
+            margin-right: 10px;
+        ">Cancelar</button>
+
+        <button id="exitConfirm" style="
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #e53935;
+            color: white;
+        ">Sair</button>
+    </div>
+</div>
 
 </body>
 </html>
