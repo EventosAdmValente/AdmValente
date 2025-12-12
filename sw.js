@@ -1,5 +1,4 @@
-<script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js");
-}
-</script>
+self.addEventListener("install",()=>{});
+self.addEventListener("fetch",e=>{
+ e.respondWith(fetch(e.request));
+});
