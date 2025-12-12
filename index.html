@@ -74,20 +74,13 @@
     "firebase/app": "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js",
     "firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js",
     "firebase/auth": "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js",
-    "react": "https://esm.sh/react@^19.2.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
-    "react/": "https://esm.sh/react@^19.2.1/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
     "firebase/": "https://esm.sh/firebase@^12.6.0/"
   }
 }
 </script>
-
-<link rel="manifest" href="./manifest.json">
-<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
-<meta name="theme-color" content="#003366">
-
 </head>
 <body class="h-screen w-full flex flex-col">
 
@@ -175,6 +168,10 @@
             searchTerm: '',
             filterStartDate: '',
             filterEndDate: '',
+            
+            // Controle de Picker
+            pickerTarget: null, // 'filterStartDate' | 'filterEndDate' | null
+            
             selectedDate: null,
             viewDate: new Date(),
 
@@ -202,7 +199,8 @@
         // --- 2. FIREBASE LISTENERS ---
 
         onAuthStateChanged(auth, (user) => {
-            state.user = user;
+            // Fix: Store only plain user data to avoid circular JSON errors
+            state.user = user ? { uid: user.uid, email: user.email } : null;
             state.isAdmin = user && user.uid === ADMIN_UID;
             console.log("Auth State:", user ? "Logged In" : "Logged Out", "Is Admin:", state.isAdmin);
             renderApp();
@@ -353,7 +351,8 @@
             document.getElementById('modal-locate-btn').onclick = () => { onLocate(); closeModal(); };
         }
 
-        // --- NAVIGATION ---
+        // --- NAVIGATION & HISTORY ---
+        
         const renderNavMenu = () => {
             if (!state.isMenuOpen) return '';
             
@@ -402,7 +401,11 @@
             `;
         }
 
-        window.navigateTo = (screen) => {
+        // Inicializar histórico
+        history.replaceState({ screen: 'home' }, '', '');
+
+        // Função interna de navegação (sem manipular histórico)
+        const internalNavigateTo = (screen) => {
             state.isMenuOpen = false;
             state.currentScreen = screen;
             state.editingRowId = null;
@@ -411,7 +414,63 @@
             state.tempSigla = '';
             state.managerSearchTerm = '';
             renderApp();
+        };
+
+        // Função pública de navegação (empurra histórico)
+        window.navigateTo = (screen) => {
+            if (state.currentScreen === screen) {
+                state.isMenuOpen = false;
+                renderApp();
+                return;
+            }
+            history.pushState({ screen: screen }, '', '');
+            internalNavigateTo(screen);
         }
+
+        // Listener do Botão Voltar (History API)
+        window.addEventListener('popstate', (event) => {
+            // Se o menu estiver aberto, fecha e mantém estado
+            if (state.isMenuOpen) {
+                 state.isMenuOpen = false;
+                 // Empurra de volta pq o 'voltar' removeu, mas só queríamos fechar o menu
+                 history.pushState({ screen: state.currentScreen }, '', ''); 
+                 renderApp();
+                 return;
+            }
+
+            // Se existe estado no evento (navegação interna)
+            if (event.state && event.state.screen) {
+                internalNavigateTo(event.state.screen);
+            } else {
+                // Se estamos na Home e o usuário tenta sair
+                if (state.currentScreen === 'home') {
+                    // Prende o usuário empurrando o estado novamente
+                    history.pushState({ screen: 'home' }, '', '');
+                    
+                    showConfirmModal("Sair do App", "Deseja realmente sair da aplicação?", () => {
+                        // Tenta voltar duas vezes para passar pelo 'trap' e sair
+                        history.go(-2); 
+                        // Fallback: Tenta fechar a janela
+                        try { window.close(); } catch(e){}
+                    });
+                    
+                    // Customiza o botão do modal
+                    setTimeout(() => {
+                        const btn = document.getElementById('modal-confirm-btn');
+                        if(btn) {
+                            btn.innerText = "Sair";
+                            btn.classList.remove('bg-red-600', 'hover:bg-red-700', 'shadow-red-600/20');
+                            btn.classList.add('bg-slate-800', 'hover:bg-slate-900', 'shadow-slate-800/20');
+                        }
+                    }, 50);
+                } 
+                // Se estávamos em sub-tela mas perdemos o estado (refresh), volta pra home
+                else {
+                    internalNavigateTo('home');
+                    history.replaceState({ screen: 'home' }, '', '');
+                }
+            }
+        });
 
         // --- HOME SCREEN ---
         function renderHome() {
@@ -459,13 +518,15 @@
                             <div class="flex flex-col gap-1">
                                 <label class="text-base font-bold text-navy ml-1">Pesquisar por período</label>
                                 <div class="grid grid-cols-2 gap-2 sm:gap-3">
-                                    <div class="flex items-center bg-white border border-slate-300 rounded-lg px-2 sm:px-3 py-1 shadow-sm focus-within:border-navy focus-within:ring-1 focus-within:ring-navy transition-all">
+                                    <div onclick="openDatePicker('filterStartDate')" class="flex items-center bg-white border border-slate-300 rounded-lg px-2 sm:px-3 py-1 shadow-sm focus-within:border-navy focus-within:ring-1 focus-within:ring-navy transition-all cursor-pointer relative">
                                         <span class="text-xs font-bold text-navy uppercase mr-1 sm:mr-2 min-w-[36px]">Início</span>
-                                        <input type="text" inputmode="numeric" placeholder="dd/mm/aa" maxlength="8" id="filterStart" class="flex-1 bg-transparent border-none p-1 text-sm text-slate-700 focus:ring-0 outline-none w-full min-w-0 font-medium placeholder:text-slate-400">
+                                        <input type="text" inputmode="numeric" placeholder="dd/mm/aa" maxlength="8" id="filterStart" class="flex-1 bg-transparent border-none p-1 text-sm text-slate-700 focus:ring-0 outline-none w-full min-w-0 font-medium placeholder:text-slate-400" onclick="event.stopPropagation()">
+                                        <i data-lucide="calendar" class="w-4 h-4 text-slate-400 ml-1"></i>
                                     </div>
-                                    <div class="flex items-center bg-white border border-slate-300 rounded-lg px-2 sm:px-3 py-1 shadow-sm focus-within:border-navy focus-within:ring-1 focus-within:ring-navy transition-all">
+                                    <div onclick="openDatePicker('filterEndDate')" class="flex items-center bg-white border border-slate-300 rounded-lg px-2 sm:px-3 py-1 shadow-sm focus-within:border-navy focus-within:ring-1 focus-within:ring-navy transition-all cursor-pointer relative">
                                         <span class="text-xs font-bold text-navy uppercase mr-1 sm:mr-2 min-w-[24px]">Fim</span>
-                                        <input type="text" inputmode="numeric" placeholder="dd/mm/aa" maxlength="8" id="filterEnd" class="flex-1 bg-transparent border-none p-1 text-sm text-slate-700 focus:ring-0 outline-none w-full min-w-0 font-medium placeholder:text-slate-400">
+                                        <input type="text" inputmode="numeric" placeholder="dd/mm/aa" maxlength="8" id="filterEnd" class="flex-1 bg-transparent border-none p-1 text-sm text-slate-700 focus:ring-0 outline-none w-full min-w-0 font-medium placeholder:text-slate-400" onclick="event.stopPropagation()">
+                                        <i data-lucide="calendar" class="w-4 h-4 text-slate-400 ml-1"></i>
                                     </div>
                                 </div>
                             </div>
@@ -503,14 +564,28 @@
                              if(iso) state.viewDate = new Date(iso + 'T00:00:00');
                              if(!state.filterEndDate) state.filterEndDate = iso;
                         }
+                        // Remover selecao unica ao digitar
                         state.selectedDate = null;
+                        
+                        // IMPORTANTE: Atualizar a UI para refletir as mudancas no filtro
+                        renderApp();
                     } else if (val === '') {
                         state[key] = '';
+                        renderApp();
                     }
                 };
 
-                document.getElementById('filterStart').addEventListener('input', (e) => handleDateInput(e, 'filterStartDate'));
-                document.getElementById('filterEnd').addEventListener('input', (e) => handleDateInput(e, 'filterEndDate'));
+                // Adiciona listener de clique direto no input tambem para abrir calendario (opcional, mas solicitado)
+                const startInput = document.getElementById('filterStart');
+                const endInput = document.getElementById('filterEnd');
+
+                startInput.addEventListener('input', (e) => handleDateInput(e, 'filterStartDate'));
+                endInput.addEventListener('input', (e) => handleDateInput(e, 'filterEndDate'));
+                
+                // Se quiser que clique NO INPUT tambem abra, descomente:
+                startInput.addEventListener('click', () => openDatePicker('filterStartDate'));
+                endInput.addEventListener('click', () => openDatePicker('filterEndDate'));
+
             }
 
             // Sync UI
@@ -591,11 +666,21 @@
             window.renderIcons();
         }
 
-        // --- AGENDA MODAL ---
+        // --- AGENDA MODAL & DATE PICKER ---
+        
+        window.openDatePicker = (target) => {
+            state.pickerTarget = target;
+            state.viewDate = new Date(); // Reset view to current month
+            // If target already has a value, try to jump to that date
+            if (target === 'filterStartDate' && state.filterStartDate) state.viewDate = new Date(state.filterStartDate + 'T00:00:00');
+            if (target === 'filterEndDate' && state.filterEndDate) state.viewDate = new Date(state.filterEndDate + 'T00:00:00');
+            
+            openAgendaModal();
+        };
 
         window.startOpenAgenda = () => {
-            state.viewDate = new Date(); // Sempre reseta para o mês atual ao abrir
-            // Se quiser limpar a seleção anterior: state.selectedDate = null;
+            state.pickerTarget = null; // Normal agenda mode
+            state.viewDate = new Date(); 
             openAgendaModal();
         }
 
@@ -623,11 +708,13 @@
                 </button>`;
             }
 
+            const title = state.pickerTarget ? 'Selecione a Data' : 'Agenda';
+
             // REMOVIDO: animate-in fade-in zoom-in da classe do modal
             const html = `
                 <div id="calendar-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-4 flex flex-col max-h-[90vh]">
                     <div class="flex justify-between items-center mb-4 flex-shrink-0">
-                        <h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5"></i> Agenda</h3>
+                        <h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5"></i> ${title}</h3>
                         <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-6 h-6"></i></button>
                     </div>
                     
@@ -644,8 +731,8 @@
                         <div class="grid grid-cols-7 gap-1 sm:gap-2 mb-2">${calendarHtml}</div>
                     </div>
                     
-                    <!-- Área de Detalhes Automática (Expande se houver data selecionada) -->
-                    ${state.selectedDate ? `
+                    <!-- Área de Detalhes Automática (Apenas se NAO for picker e tiver data) -->
+                    ${!state.pickerTarget && state.selectedDate ? `
                         <div class="border-t pt-3 mt-2 flex-1 min-h-0 flex flex-col">
                             <div class="text-xs font-bold text-slate-500 uppercase mb-2">Eventos do dia ${formatDate(state.selectedDate)}</div>
                             
@@ -673,19 +760,37 @@
                         </div>
                     ` : '<div class="flex-1"></div>'}
 
-                    <!-- Rodapé com Botão -->
+                    <!-- Rodapé -->
+                    ${!state.pickerTarget ? `
                     <div class="mt-4 pt-3 border-t">
-                        <!-- ALTERAÇÃO: onclick inclui renderApp() para atualizar a lista principal -->
                         <button onclick="closeModal(); renderApp()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold hover:bg-navy-dark transition-colors shadow-lg shadow-blue-900/10 flex items-center justify-center gap-2">
                             <i data-lucide="list" class="w-4 h-4"></i> Ver na Lista
                         </button>
                     </div>
+                    ` : ''}
                 </div>
             `;
             window.showModal(html);
         };
 
         window.toggleDateSelection = (d) => { 
+            // Se estiver no modo Picker, seleciona e fecha
+            if (state.pickerTarget) {
+                state[state.pickerTarget] = d;
+                
+                // Se definiu start, garante que end nao seja menor (opcional, mas bom UX)
+                if (state.pickerTarget === 'filterStartDate' && state.filterEndDate && state.filterEndDate < d) {
+                     state.filterEndDate = d;
+                }
+                
+                state.selectedDate = null; // Limpa selecao de agenda unitaria
+                state.pickerTarget = null;
+                closeModal();
+                renderApp();
+                return;
+            }
+
+            // Modo Agenda Normal
             state.selectedDate = state.selectedDate === d ? null : d; 
             state.filterStartDate = state.selectedDate || ''; 
             state.filterEndDate = state.selectedDate || ''; 
@@ -985,12 +1090,5 @@
 
         renderApp();
     </script>
-
-<script>
-if("serviceWorker" in navigator){
- navigator.serviceWorker.register("./sw.js");
-}
-</script>
-
 </body>
 </html>
