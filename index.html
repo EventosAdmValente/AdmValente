@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eventos Adm Valente</title>
+    <meta name="description" content="Gerenciador de Agenda Administrativa">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* Slate 100 */
+            color: #334155; /* Slate 700 */
+            overflow: hidden; /* App-like feel */
+        }
+        
+        /* Ocultar barra de rolagem mas manter funcionalidade */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+        html, body, * {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Classes utilitárias personalizadas para cores */
+        .bg-navy { background-color: #003366; }
+        .text-navy { color: #003366; }
+        .border-navy { border-color: #003366; }
+        .hover-bg-navy-dark:hover { background-color: #002855; }
+        
+        .bg-orange-custom { background-color: #FF8C00; }
+        .text-orange-custom { color: #FF8C00; }
+        .border-orange-custom { border-color: #FF8C00; }
+        .hover-bg-orange-dark:hover { background-color: #e67e00; }
+
+        /* Animações */
+        .fade-in { animation: fadeIn 0.2s ease-in-out; }
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+
+        /* Input autofill override */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active{
+            -webkit-box-shadow: 0 0 0 30px white inset !important;
+        }
+        
+        /* Disabled inputs style */
+        input:disabled, select:disabled {
+            background-color: #f1f5f9; /* Slate 100 */
+            color: #64748b; /* Slate 500 */
+            cursor: not-allowed;
+            border-color: #cbd5e1;
+        }
+    </style>
+    
+    <!-- Import Map para Firebase -->
+    <script type="importmap">
+{
+  "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js",
+    "react": "https://esm.sh/react@^19.2.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
+    "react/": "https://esm.sh/react@^19.2.1/",
+    "firebase/": "https://esm.sh/firebase@^12.6.0/"
+  }
+}
+</script>
+</head>
+<body class="h-screen w-full flex flex-col">
+
+    <!-- Container Principal do App -->
+    <div id="app" class="flex-1 w-full h-full relative overflow-hidden">
+        <!-- O conteúdo será renderizado aqui via JavaScript -->
+        <div class="flex items-center justify-center h-full text-slate-400">
+            <div class="flex flex-col items-center gap-2">
+                <div class="w-8 h-8 border-4 border-navy border-t-transparent rounded-full animate-spin"></div>
+                <span class="text-sm font-medium">Carregando Agenda...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Container -->
+    <div id="modal-container" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm transition-opacity">
+        <!-- Conteúdo do modal injetado via JS -->
+    </div>
+
+    <!-- Login Modal Template -->
+    <template id="login-modal-template">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div class="p-5 border-b border-slate-100 bg-slate-50">
+                <h3 class="font-bold text-lg text-navy">Área Administrativa</h3>
+            </div>
+            <form id="login-form" class="p-6 flex flex-col gap-4">
+                <div>
+                    <label class="text-sm font-bold text-slate-700 mb-1 block">Email</label>
+                    <input type="email" id="login-email" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-navy/20 outline-none" required>
+                </div>
+                <div>
+                    <label class="text-sm font-bold text-slate-700 mb-1 block">Senha</label>
+                    <input type="password" id="login-password" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-navy/20 outline-none" required>
+                </div>
+                <div id="login-error" class="text-red-500 text-sm hidden"></div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeModal()" class="flex-1 py-2 rounded text-slate-600 hover:bg-slate-100">Cancelar</button>
+                    <button type="submit" class="flex-1 py-2 rounded bg-navy text-white hover:bg-navy-dark font-medium">Entrar</button>
+                </div>
+            </form>
+        </div>
+    </template>
+
+    <script type="module">
+        
+        import { initializeApp, getApps, getApp } from "firebase/app";
+        import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged} from "firebase/auth";
+
+        // --- 0. CONFIGURAÇÃO E SEGURANÇA ---
+        
+        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // !!! ATENÇÃO: MANTENHA O UID ABAIXO (SEU UID DE ADMIN) !!!
+        const ADMIN_UID = "kRzVsk2nqNTyj79Lk4h6Fmhk7JP2"; 
+        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCmceNv1eBJLj7aWMcR7crvSVxonuzDVQo",
+            authDomain: "agendaadmvalente.firebaseapp.com",
+            projectId: "agendaadmvalente",
+            storageBucket: "agendaadmvalente.firebasestorage.app",
+            messagingSenderId: "810572581910",
+            appId: "1:810572581910:web:155a7e18f6c46f77faf937"
+        };
+        
+        const appInfo = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+        const db = getFirestore(appInfo);
+        const auth = getAuth(appInfo);
+
+        // --- 1. STATE MANAGEMENT ---
+        
+        const INITIAL_STATE = {
+            user: null, 
+            isAdmin: false, 
+            currentScreen: 'home',
+            
+            events: [],
+            types: [],
+            locations: [],
+            attendants: [],
+            
+            isMenuOpen: false,
+            editingEventId: null,
+            
+            searchTerm: '',
+            filterStartDate: '',
+            filterEndDate: '',
+            selectedDate: null,
+            viewDate: new Date(),
+
+            editingRowId: null,
+            isCreatingRow: false,
+            tempName: '',
+            tempSigla: '',
+            managerSearchTerm: ''
+        };
+
+        const state = new Proxy(INITIAL_STATE, {
+            set(target, property, value) {
+                target[property] = value;
+                // Renderização seletiva para performance em inputs de texto
+                if (!['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm'].includes(property)) {
+                    renderApp(); 
+                } else {
+                    if (property === 'searchTerm') renderHome(); 
+                    if (property === 'managerSearchTerm') renderApp(); 
+                }
+                return true;
+            }
+        });
+
+        // --- 2. FIREBASE LISTENERS ---
+
+        onAuthStateChanged(auth, (user) => {
+            state.user = user;
+            state.isAdmin = user && user.uid === ADMIN_UID;
+            console.log("Auth State:", user ? "Logged In" : "Logged Out", "Is Admin:", state.isAdmin);
+            renderApp();
+        });
+
+        const setupListeners = () => {
+            onSnapshot(query(collection(db, "agenda"), orderBy("date"), orderBy("time")), (s) => {
+                state.events = s.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderApp();
+            });
+            onSnapshot(query(collection(db, "types"), orderBy("name")), (s) => {
+                state.types = s.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderApp();
+            });
+            onSnapshot(query(collection(db, "locations"), orderBy("name")), (s) => {
+                state.locations = s.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderApp();
+            });
+            onSnapshot(query(collection(db, "attendants"), orderBy("name")), (s) => {
+                state.attendants = s.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderApp();
+            });
+        };
+
+        setupListeners();
+
+        // --- 3. HELPER FUNCTIONS ---
+        
+        // Convert ISO (YYYY-MM-DD) to Display (dd/mm/yy)
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return dateStr;
+            return `${parts[2]}/${parts[1]}/${parts[0].slice(2)}`;
+        }
+
+        // Convert Display (dd/mm/yy) to ISO (YYYY-MM-DD)
+        function parseDisplayDateToIso(displayStr) {
+            if(!displayStr || displayStr.length !== 8) return '';
+            const parts = displayStr.split('/');
+            if(parts.length !== 3) return '';
+            return `20${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+
+        function isEventPast(date, time) {
+            const eventDate = new Date(`${date}T${time}`);
+            return eventDate < new Date();
+        }
+
+        // --- 4. DOM MANIPULATION ---
+
+        const appElement = document.getElementById('app');
+        const modalContainer = document.getElementById('modal-container');
+
+        window.state = state;
+        window.renderIcons = () => { if(window.lucide) lucide.createIcons(); }
+
+        window.renderApp = () => {
+            // Se o modal da agenda estiver aberto, não renderiza o app principal para não fechar o modal
+            if (document.getElementById('calendar-modal-content')) return;
+
+            switch (state.currentScreen) {
+                case 'home': renderHome(); break;
+                case 'event-form': renderEventForm(); break;
+                case 'types': renderGenericManager('Tipos de Eventos', 'types', 'Tipo', true); break;
+                case 'locations': renderGenericManager('Localidades', 'locations', 'Localidade', false); break;
+                case 'attendants': renderGenericManager('Atendentes', 'attendants', 'Atendente', false); break;
+            }
+            window.renderIcons();
+        }
+
+        // --- MODALS & AUTH ---
+
+        window.showLoginModal = () => {
+            state.isMenuOpen = false; // Close menu if open
+            renderApp(); // Refresh menu state
+            
+            const template = document.getElementById('login-modal-template');
+            const clone = template.content.cloneNode(true);
+            modalContainer.innerHTML = '';
+            modalContainer.appendChild(clone);
+            modalContainer.classList.remove('hidden');
+            
+            document.getElementById('login-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                const errorDiv = document.getElementById('login-error');
+                
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                    closeModal();
+                } catch (error) {
+                    errorDiv.textContent = "Erro ao entrar: Verifique credenciais.";
+                    errorDiv.classList.remove('hidden');
+                }
+            };
+        };
+
+        window.handleLogout = async () => {
+            await signOut(auth);
+            state.isMenuOpen = false;
+        };
+
+        window.showModal = (contentHtml) => {
+            modalContainer.innerHTML = contentHtml;
+            modalContainer.classList.remove('hidden');
+            window.renderIcons();
+        }
+        window.closeModal = () => {
+            modalContainer.classList.add('hidden');
+            modalContainer.innerHTML = '';
+        }
+
+        window.showConfirmModal = (title, message, onConfirm) => {
+            const html = `
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 transform transition-all scale-100 animate-in fade-in zoom-in">
+                    <h3 class="font-bold text-lg text-navy mb-4">${title}</h3>
+                    <p class="text-slate-600 text-center mb-6">${message}</p>
+                    <div class="flex gap-3">
+                        <button onclick="closeModal()" class="flex-1 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Cancelar</button>
+                        <button id="modal-confirm-btn" class="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20">Excluir</button>
+                    </div>
+                </div>
+            `;
+            window.showModal(html);
+            document.getElementById('modal-confirm-btn').onclick = () => { onConfirm(); closeModal(); };
+        }
+
+        window.showDuplicateModal = (title, message, fieldName, value, onLocate) => {
+             const html = `
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in">
+                    <div class="flex items-center gap-3 mb-4 text-yellow-800">
+                       <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                       <h3 class="font-bold text-lg">${title}</h3>
+                    </div>
+                    <div class="text-slate-600 text-center mb-6">
+                      <p>${message}</p>
+                      <p class="mt-2 font-bold text-slate-800">"${value}"</p>
+                    </div>
+                    <div class="flex gap-3">
+                      <button onclick="closeModal()" class="flex-1 py-2 rounded-lg bg-slate-100 hover:bg-slate-200">Cancelar</button>
+                      <button id="modal-locate-btn" class="flex-1 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white">Localizar</button>
+                    </div>
+                  </div>
+            `;
+            window.showModal(html);
+            document.getElementById('modal-locate-btn').onclick = () => { onLocate(); closeModal(); };
+        }
+
+        // --- NAVIGATION ---
+        const renderNavMenu = () => {
+            if (!state.isMenuOpen) return '';
+            
+            return `
+            <div class="fixed inset-0 z-50 transition-all duration-300">
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="state.isMenuOpen = false; renderApp()"></div>
+                <div class="relative w-72 h-full bg-navy text-white flex flex-col shadow-2xl slide-in">
+                    <div class="p-6 border-b border-white/10 flex justify-between items-center bg-[#002855]">
+                        <h2 class="text-xl font-bold tracking-tight">Menu</h2>
+                        <button onclick="state.isMenuOpen = false; renderApp()" class="hover:text-orange-custom"><i data-lucide="x"></i></button>
+                    </div>
+                    <nav class="flex-1 py-4 flex flex-col gap-1">
+                        <button onclick="navigateTo('home')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 transition-colors text-left gap-3 border-l-4 border-transparent hover:border-orange-custom">
+                            <i data-lucide="calendar" class="text-orange-custom w-5 h-5"></i>
+                            <span class="font-medium">Tela Inicial</span>
+                        </button>
+                        <button onclick="navigateTo('types')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 transition-colors text-left gap-3 border-l-4 border-transparent hover:border-orange-custom">
+                            <i data-lucide="tag" class="text-orange-custom w-5 h-5"></i>
+                            <span class="font-medium">Tipos de Eventos</span>
+                        </button>
+                        <button onclick="navigateTo('locations')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 transition-colors text-left gap-3 border-l-4 border-transparent hover:border-orange-custom">
+                            <i data-lucide="map-pin" class="text-orange-custom w-5 h-5"></i>
+                            <span class="font-medium">Localidades</span>
+                        </button>
+                        <button onclick="navigateTo('attendants')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 transition-colors text-left gap-3 border-l-4 border-transparent hover:border-orange-custom">
+                            <i data-lucide="users" class="text-orange-custom w-5 h-5"></i>
+                            <span class="font-medium">Atendentes</span>
+                        </button>
+                    </nav>
+                    
+                    <!-- Login/Logout no Menu -->
+                    <div class="p-4 border-t border-white/10 bg-[#002244]">
+                        ${state.user ? `
+                            <div class="mb-3 text-xs text-slate-400 truncate">Logado: ${state.user.email}</div>
+                            <button onclick="handleLogout()" class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-200 rounded-lg transition-colors text-sm font-medium">
+                                <i data-lucide="log-out" class="w-4 h-4"></i> Sair
+                            </button>
+                        ` : `
+                            <button onclick="showLoginModal()" class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors text-sm font-medium">
+                                <i data-lucide="lock" class="w-4 h-4"></i> Login Administrativo
+                            </button>
+                        `}
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+
+        window.navigateTo = (screen) => {
+            state.isMenuOpen = false;
+            state.currentScreen = screen;
+            state.editingRowId = null;
+            state.isCreatingRow = false;
+            state.tempName = '';
+            state.tempSigla = '';
+            state.managerSearchTerm = '';
+            renderApp();
+        }
+
+        // --- HOME SCREEN ---
+        function renderHome() {
+            let container = document.getElementById('home-container');
+            if (!container) {
+                appElement.innerHTML = '';
+                container = document.createElement('div');
+                container.id = 'home-container';
+                // Layout Flexbox de ponta a ponta
+                container.className = "flex flex-col h-full bg-slate-100 relative";
+                
+                container.innerHTML = `
+                    <div id="nav-menu-placeholder"></div>
+                    <!-- Header -->
+                    <div class="bg-navy text-white p-4 sticky top-0 z-10 shadow-lg shadow-blue-900/10 flex justify-between items-center flex-shrink-0">
+                        <button onclick="state.isMenuOpen = true; renderApp()" class="p-1 hover:bg-white/10 rounded-md transition-colors"><i data-lucide="menu" class="w-7 h-7"></i></button>
+                        <h1 class="text-lg font-bold uppercase tracking-wide">Eventos Adm Valente</h1>
+                        <div class="w-8"></div>
+                    </div>
+
+                    <!-- Wrapper flexível que ocupa o resto da tela e contém o padding -->
+                    <div class="flex flex-col flex-1 overflow-hidden p-4 sm:p-6 gap-4 max-w-xl mx-auto w-full">
+                        
+                        <!-- Filters (Altura dinâmica, não cresce) -->
+                        <div class="flex flex-col gap-3 flex-shrink-0">
+                             <div class="relative">
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-base font-bold text-navy ml-1">Pesquisar eventos</label>
+                                    <div class="flex gap-2">
+                                        <button onclick="resetAllFilters()" class="flex items-center gap-1 px-3 py-1 bg-slate-200 text-slate-700 text-xs font-bold rounded hover:bg-slate-300 transition-colors shadow-sm">
+                                            <i data-lucide="list" class="w-3 h-3"></i> Ver Todos
+                                        </button>
+                                        <button onclick="startOpenAgenda()" class="flex items-center gap-1 px-3 py-1 bg-navy text-white text-xs font-bold rounded hover:bg-navy-dark transition-colors shadow-sm">
+                                            <i data-lucide="calendar" class="w-3 h-3"></i> Agenda
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="relative mt-1">
+                                    <input id="homeSearch" type="text" placeholder="Sigla, Tipo, Local ou Atendente..." 
+                                        class="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy shadow-sm transition-all bg-white"
+                                    >
+                                    <i data-lucide="search" class="absolute left-3 top-2.5 text-slate-400 w-4 h-4"></i>
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-base font-bold text-navy ml-1">Pesquisar por período</label>
+                                <div class="grid grid-cols-2 gap-2 sm:gap-3">
+                                    <div class="flex items-center bg-white border border-slate-300 rounded-lg px-2 sm:px-3 py-1 shadow-sm focus-within:border-navy focus-within:ring-1 focus-within:ring-navy transition-all">
+                                        <span class="text-xs font-bold text-navy uppercase mr-1 sm:mr-2 min-w-[36px]">Início</span>
+                                        <input type="text" inputmode="numeric" placeholder="dd/mm/aa" maxlength="8" id="filterStart" class="flex-1 bg-transparent border-none p-1 text-sm text-slate-700 focus:ring-0 outline-none w-full min-w-0 font-medium placeholder:text-slate-400">
+                                    </div>
+                                    <div class="flex items-center bg-white border border-slate-300 rounded-lg px-2 sm:px-3 py-1 shadow-sm focus-within:border-navy focus-within:ring-1 focus-within:ring-navy transition-all">
+                                        <span class="text-xs font-bold text-navy uppercase mr-1 sm:mr-2 min-w-[24px]">Fim</span>
+                                        <input type="text" inputmode="numeric" placeholder="dd/mm/aa" maxlength="8" id="filterEnd" class="flex-1 bg-transparent border-none p-1 text-sm text-slate-700 focus:ring-0 outline-none w-full min-w-0 font-medium placeholder:text-slate-400">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Event List Container (Cresce para ocupar o resto) -->
+                        <div id="event-list-container" class="flex flex-col gap-2 flex-1 min-h-0"></div>
+                    </div>
+                    
+                    <!-- FAB: Only for Admins -->
+                    <div id="fab-container"></div>
+                `;
+                appElement.appendChild(container);
+                
+                document.getElementById('homeSearch').addEventListener('input', (e) => { state.searchTerm = e.target.value; if(e.target.value) clearDateFilters(false); });
+                
+                // MASK & FILTER LOGIC
+                const handleDateInput = (e, key) => {
+                    let v = e.target.value.replace(/\D/g, '');
+                    if (v.length > 6) v = v.slice(0, 6);
+                    
+                    if (v.length > 4) {
+                        e.target.value = `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
+                    } else if (v.length > 2) {
+                        e.target.value = `${v.slice(0, 2)}/${v.slice(2)}`;
+                    } else {
+                        e.target.value = v;
+                    }
+                    
+                    const val = e.target.value;
+                    if (val.length === 8) { // dd/mm/yy
+                        const iso = parseDisplayDateToIso(val);
+                        state[key] = iso;
+                        if(key === 'filterStartDate') {
+                             if(iso) state.viewDate = new Date(iso + 'T00:00:00');
+                             if(!state.filterEndDate) state.filterEndDate = iso;
+                        }
+                        state.selectedDate = null;
+                    } else if (val === '') {
+                        state[key] = '';
+                    }
+                };
+
+                document.getElementById('filterStart').addEventListener('input', (e) => handleDateInput(e, 'filterStartDate'));
+                document.getElementById('filterEnd').addEventListener('input', (e) => handleDateInput(e, 'filterEndDate'));
+            }
+
+            // Sync UI
+            const homeSearch = document.getElementById('homeSearch');
+            if (document.activeElement !== homeSearch) homeSearch.value = state.searchTerm;
+            
+            // Sync Dates (formatted)
+            const fStart = document.getElementById('filterStart');
+            const fEnd = document.getElementById('filterEnd');
+            if (document.activeElement !== fStart) fStart.value = formatDate(state.filterStartDate);
+            if (document.activeElement !== fEnd) fEnd.value = formatDate(state.filterEndDate);
+
+            document.getElementById('nav-menu-placeholder').innerHTML = renderNavMenu();
+            
+            // FAB Logic (Admin Only)
+            document.getElementById('fab-container').innerHTML = state.isAdmin ? `
+                <button onclick="startCreateEvent()" class="fixed bottom-6 right-6 w-14 h-14 bg-orange-custom text-white rounded-full shadow-xl shadow-orange-500/30 flex items-center justify-center hover:bg-orange-dark active:scale-90 transition-all z-50 border border-white/20">
+                    <i data-lucide="plus" class="w-7 h-7"></i>
+                </button>
+            ` : '';
+
+            // Filter
+            const lowerTerm = state.searchTerm.toLowerCase();
+            const filteredEvents = state.events.filter(e => {
+                const type = state.types.find(t => t.id === e.typeId);
+                const loc = state.locations.find(l => l.id === e.locationId);
+                const att = state.attendants.find(a => a.id === e.attendantId);
+                const matchesSearch = !state.searchTerm || (type?.name.toLowerCase().includes(lowerTerm)) || (type?.sigla?.toLowerCase().includes(lowerTerm)) || (loc?.name.toLowerCase().includes(lowerTerm)) || (att?.name.toLowerCase().includes(lowerTerm));
+                let matchesDate = true;
+                if (state.selectedDate) matchesDate = e.date === state.selectedDate;
+                else if (state.filterStartDate || state.filterEndDate) {
+                    const start = state.filterStartDate || '0000-00-00';
+                    const end = state.filterEndDate || '9999-12-31';
+                    matchesDate = e.date >= start && e.date <= end;
+                }
+                return matchesSearch && matchesDate;
+            });
+
+            // List
+            let listHeader = state.selectedDate ? `Eventos em ${formatDate(state.selectedDate)}` : (state.filterStartDate ? `Filtro por Período` : 'Próximos eventos');
+            document.getElementById('event-list-container').innerHTML = `
+                <div class="flex justify-between items-end px-1 flex-shrink-0">
+                    <label class="text-base font-bold text-navy">${listHeader}</label>
+                    <span class="text-sm font-medium text-slate-500">Total: ${filteredEvents.length}</span>
+                </div>
+                <!-- Lista Flexível com Scroll Interno -->
+                <div class="flex-1 overflow-y-auto border border-slate-200 bg-slate-50 rounded-xl shadow-md shadow-slate-200 min-h-0">
+                    ${filteredEvents.length === 0 ? `<div class="h-full flex flex-col items-center justify-center text-slate-400 p-4 text-center"><p>Nenhum evento encontrado.</p></div>` : 
+                    `<ul class="divide-y divide-slate-200/50">
+                        ${filteredEvents.map(e => {
+                            const type = state.types.find(t => t.id === e.typeId);
+                            const loc = state.locations.find(l => l.id === e.locationId);
+                            const att = state.attendants.find(a => a.id === e.attendantId);
+                            const isPast = isEventPast(e.date, e.time);
+                            // Logic: If Admin, interactive (pointer, onclick). If User, readonly (default cursor, no onclick).
+                            const interactionClass = state.isAdmin ? 'cursor-pointer hover:bg-slate-100' : 'cursor-default';
+                            const clickAction = state.isAdmin ? `onclick="openEditEvent('${e.id}')"` : '';
+                            
+                            return `
+                            <li ${clickAction} class="p-3 ${interactionClass} transition-colors border-b border-slate-200/50 last:border-0 relative overflow-hidden group ${isPast && state.isAdmin ? 'bg-slate-50' : ''}">
+                                <div class="flex items-start gap-3 ${isPast ? 'opacity-70 grayscale-[0.8]' : ''}">
+                                    <div class="flex-shrink-0 w-12 h-12 rounded-xl border flex items-center justify-center shadow-sm relative ${isPast ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-blue-50 border-blue-100 text-navy'}"><i data-lucide="${isPast ? 'check-circle-2' : 'calendar-clock'}" class="w-6 h-6"></i></div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex justify-between items-start mb-0.5"><h3 class="font-bold text-navy text-base truncate pr-2">${type?.name || 'Evento'}</h3><span class="px-2 py-0.5 rounded text-xs font-bold tracking-wide shadow-sm flex-shrink-0 ${isPast ? 'bg-slate-300 text-slate-600' : 'bg-slate-500 text-white shadow-slate-200'}">${type?.sigla || 'SIG'}</span></div>
+                                        <div class="text-sm font-medium text-slate-500 mb-1.5">${formatDate(e.date)} <span class="text-slate-300 mx-1">|</span> ${e.time}</div>
+                                        <div class="flex flex-col gap-0.5">
+                                            <div class="flex items-center text-sm text-slate-600"><i data-lucide="map-pin" class="w-3.5 h-3.5 mr-1.5 flex-shrink-0 ${isPast ? 'text-slate-400' : 'text-navy'}"></i><span class="truncate">${loc?.name}</span></div>
+                                            <div class="flex items-center text-sm text-slate-600"><i data-lucide="users" class="w-3.5 h-3.5 mr-1.5 flex-shrink-0 text-slate-400"></i><span class="truncate">${att?.name}</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>`;
+                        }).join('')}
+                    </ul>`}
+                </div>
+            `;
+            // Correção para ícones sumindo: Chamar renderIcons após atualizar a lista HTML
+            window.renderIcons();
+        }
+
+        // --- AGENDA MODAL ---
+
+        window.startOpenAgenda = () => {
+            state.viewDate = new Date(); // Sempre reseta para o mês atual ao abrir
+            // Se quiser limpar a seleção anterior: state.selectedDate = null;
+            openAgendaModal();
+        }
+
+        window.openAgendaModal = () => {
+            const year = state.viewDate.getFullYear();
+            const month = state.viewDate.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const firstDay = new Date(year, month, 1).getDay();
+            
+            let calendarHtml = '';
+            for (let i = 0; i < firstDay; i++) calendarHtml += `<div class="aspect-square"></div>`;
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const eventsOnDay = state.events.filter(e => e.date === dateStr);
+                const isSelected = state.selectedDate === dateStr;
+                const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+                const isSunday = new Date(year, month, day).getDay() === 0;
+                let dotsHtml = eventsOnDay.slice(0, 4).map(() => `<span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isSelected ? 'bg-orange-custom' : 'bg-navy'}"></span>`).join('');
+                if (eventsOnDay.length > 4) dotsHtml += `<span class="text-[8px] leading-none ${isSelected ? 'text-orange-custom' : 'text-navy'}">+</span>`;
+                
+                calendarHtml += `
+                <button onclick="toggleDateSelection('${dateStr}')" class="aspect-square flex flex-col items-center justify-start pt-1.5 rounded-lg relative transition-all duration-200 border ${isSelected ? 'bg-navy text-white shadow-md shadow-blue-900/20 border-navy scale-105 z-10' : 'hover:bg-slate-200/60 border-transparent'} ${isToday && !isSelected ? 'bg-blue-50/50 font-bold border-blue-200' : ''} ${!isSelected && isSunday ? 'text-red-600' : (!isSelected ? 'text-slate-700' : '')} ${!isSelected && !isSunday && isToday ? 'text-navy' : ''}">
+                    <span class="text-xs sm:text-sm leading-none mb-1">${day}</span>
+                    <div class="flex gap-0.5 sm:gap-1 justify-center flex-wrap content-start px-0.5 w-full">${dotsHtml}</div>
+                </button>`;
+            }
+
+            // REMOVIDO: animate-in fade-in zoom-in da classe do modal
+            const html = `
+                <div id="calendar-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-4 flex flex-col max-h-[90vh]">
+                    <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                        <h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5"></i> Agenda</h3>
+                        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-6 h-6"></i></button>
+                    </div>
+                    
+                    <div class="flex-shrink-0">
+                        <div class="flex justify-between items-center mb-4 gap-2 bg-slate-50 p-2 rounded-lg">
+                            <button onclick="changeMonth(-1)" class="p-1.5 hover:bg-slate-200/50 rounded-full text-slate-600 transition-colors"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                            <div class="flex gap-2 items-center flex-1 justify-center">
+                                <select onchange="changeViewDate()" id="monthSelect" class="p-1 rounded bg-transparent font-bold text-navy cursor-pointer hover:bg-slate-100 border-none focus:ring-0 text-base appearance-none text-center">${['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'].map((m, i) => `<option value="${i}" ${i === state.viewDate.getMonth() ? 'selected' : ''}>${m}</option>`).join('')}</select>
+                                <select onchange="changeViewDate()" id="yearSelect" class="p-1 rounded bg-transparent font-bold text-navy cursor-pointer hover:bg-slate-100 border-none focus:ring-0 text-base appearance-none text-center">${Array.from({length: 10}, (_, i) => new Date().getFullYear() - 5 + i).map(y => `<option value="${y}" ${y === state.viewDate.getFullYear() ? 'selected' : ''}>${y}</option>`).join('')}</select>
+                            </div>
+                            <button onclick="changeMonth(1)" class="p-1.5 hover:bg-slate-200/50 rounded-full text-slate-600 transition-colors"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                        </div>
+                        <div class="grid grid-cols-7 gap-1 text-center text-xs font-black text-slate-400 mb-2"><div class="text-red-500">D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div></div>
+                        <div class="grid grid-cols-7 gap-1 sm:gap-2 mb-2">${calendarHtml}</div>
+                    </div>
+                    
+                    <!-- Área de Detalhes Automática (Expande se houver data selecionada) -->
+                    ${state.selectedDate ? `
+                        <div class="border-t pt-3 mt-2 flex-1 min-h-0 flex flex-col">
+                            <div class="text-xs font-bold text-slate-500 uppercase mb-2">Eventos do dia ${formatDate(state.selectedDate)}</div>
+                            
+                            <div class="flex flex-col gap-1 overflow-y-auto max-h-[180px] pr-1">
+                                ${state.events.filter(e => e.date === state.selectedDate).length === 0 
+                                    ? '<div class="text-center text-slate-400 text-xs py-4 italic">Nenhum evento agendado.</div>' 
+                                    : state.events.filter(e => e.date === state.selectedDate).map(e => {
+                                        const type = state.types.find(t => t.id === e.typeId);
+                                        const loc = state.locations.find(l => l.id === e.locationId);
+                                        // Layout em linha única
+                                        return `
+                                            <div class="bg-slate-50 hover:bg-slate-100 border border-slate-200 p-2 rounded flex items-center gap-2 text-xs transition-colors">
+                                                <span class="font-bold text-navy whitespace-nowrap">${e.time}</span>
+                                                ${type?.sigla ? `<span class="bg-blue-100 text-blue-800 px-1.5 rounded-[3px] font-bold text-[10px] min-w-[30px] text-center">${type.sigla}</span>` : ''}
+                                                <span class="truncate font-medium text-slate-700 flex-1">${type?.name || 'Evento'}</span>
+                                                <div class="flex items-center text-slate-500 max-w-[30%] truncate gap-1 border-l pl-2 border-slate-300">
+                                                    <i data-lucide="map-pin" class="w-3 h-3"></i>
+                                                    <span class="truncate">${loc?.name || '-'}</span>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')
+                                }
+                            </div>
+                        </div>
+                    ` : '<div class="flex-1"></div>'}
+
+                    <!-- Rodapé com Botão -->
+                    <div class="mt-4 pt-3 border-t">
+                        <!-- ALTERAÇÃO: onclick inclui renderApp() para atualizar a lista principal -->
+                        <button onclick="closeModal(); renderApp()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold hover:bg-navy-dark transition-colors shadow-lg shadow-blue-900/10 flex items-center justify-center gap-2">
+                            <i data-lucide="list" class="w-4 h-4"></i> Ver na Lista
+                        </button>
+                    </div>
+                </div>
+            `;
+            window.showModal(html);
+        };
+
+        window.toggleDateSelection = (d) => { 
+            state.selectedDate = state.selectedDate === d ? null : d; 
+            state.filterStartDate = state.selectedDate || ''; 
+            state.filterEndDate = state.selectedDate || ''; 
+            // Se o modal estiver aberto, apenas atualiza o modal. Senão, renderiza o app.
+            if(document.getElementById('calendar-modal-content')) openAgendaModal();
+            else renderApp(); 
+        };
+        
+        window.changeMonth = (d) => { 
+            state.viewDate = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() + d, 1); 
+            if(document.getElementById('calendar-modal-content')) openAgendaModal();
+            else renderApp(); 
+        };
+        
+        window.changeViewDate = () => { 
+            state.viewDate = new Date(parseInt(document.getElementById('yearSelect').value), parseInt(document.getElementById('monthSelect').value), 1); 
+            if(document.getElementById('calendar-modal-content')) openAgendaModal();
+            else renderApp(); 
+        };
+        
+        window.clearDateFilters = (r = true) => { 
+            state.selectedDate = null; state.filterStartDate = ''; state.filterEndDate = ''; 
+            if(r) renderApp(); 
+        };
+        
+        window.resetAllFilters = () => {
+            state.searchTerm = '';
+            state.selectedDate = null;
+            state.filterStartDate = '';
+            state.filterEndDate = '';
+            renderApp();
+        };
+
+        // --- ACTIONS ---
+        window.startCreateEvent = () => { if (!state.isAdmin) return; state.editingEventId = null; navigateTo('event-form'); };
+        window.openEditEvent = (id) => { state.editingEventId = id; navigateTo('event-form'); }; 
+
+        // --- GENERIC MANAGER ---
+        function renderGenericManager(title, collectionKey, entityName, includeSigla) {
+            const screenId = `manager-screen-${collectionKey}`;
+            let container = document.getElementById(screenId);
+            if (!container) {
+                appElement.innerHTML = '';
+                container = document.createElement('div');
+                container.id = screenId;
+                container.className = "flex flex-col h-screen overflow-y-auto bg-slate-100 pb-20 relative";
+                container.innerHTML = `
+                    <div class="bg-navy text-white p-4 sticky top-0 z-10 shadow-lg shadow-blue-900/10 flex items-center gap-3">
+                        <button onclick="navigateTo('home')" class="p-1 hover:bg-white/10 rounded-full transition-colors"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
+                        <h1 class="text-lg font-bold uppercase tracking-wide">${title}</h1>
+                    </div>
+                    <div class="p-4 sm:p-6 flex flex-col gap-6 max-w-xl mx-auto w-full flex-1">
+                        <div class="relative">
+                            <label class="text-base font-bold text-navy ml-1">Pesquisar ${entityName.toLowerCase()}</label>
+                            <div class="relative mt-1"><input id="managerSearch" type="text" placeholder="Digite para buscar..." class="w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy shadow-sm transition-all bg-white"><i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i></div>
+                        </div>
+                        <div id="manager-list-container" class="flex-col gap-1 flex flex-1"></div>
+                    </div>
+                    <div id="fab-manager"></div>
+                `;
+                appElement.appendChild(container);
+                document.getElementById('managerSearch').addEventListener('input', (e) => { state.managerSearchTerm = e.target.value; });
+            }
+
+            const searchInput = document.getElementById('managerSearch');
+            if (document.activeElement !== searchInput) searchInput.value = state.managerSearchTerm;
+            
+            // FAB Logic for Manager (Only Admin)
+            document.getElementById('fab-manager').innerHTML = state.isAdmin ? `
+                 <button onclick="startCreateRow()" class="fixed bottom-6 right-6 w-14 h-14 bg-orange-custom text-white rounded-full shadow-xl shadow-orange-500/30 flex items-center justify-center hover:bg-orange-dark active:scale-90 transition-all z-50 border border-white/20">
+                    <i data-lucide="plus" class="w-7 h-7"></i>
+                </button>
+            ` : '';
+
+            const list = state[collectionKey];
+            const lowerTerm = state.managerSearchTerm.toLowerCase();
+            const filteredList = list.filter(item => item.name.toLowerCase().includes(lowerTerm) || (includeSigla && item.sigla && item.sigla.toLowerCase().includes(lowerTerm)));
+
+            document.getElementById('manager-list-container').innerHTML = `
+                <div class="flex justify-between items-end px-1 mb-1"><label class="text-base font-bold text-navy">Lista de ${title}</label><span class="text-sm font-medium text-slate-500">Total: ${filteredList.length}</span></div>
+                <div class="flex-1 overflow-visible border border-slate-200 bg-slate-50 rounded-xl shadow-md min-h-[400px]">
+                    <ul class="divide-y divide-slate-200/50">
+                        ${state.isCreatingRow ? renderInlineRow(null, entityName, includeSigla, true) : ''}
+                        ${filteredList.length === 0 && !state.isCreatingRow ? `<div class="h-32 flex items-center justify-center text-slate-400 text-sm p-4 text-center">Nenhum item encontrado</div>` : filteredList.map(item => {
+                            if (state.editingRowId === item.id) return renderInlineRow(item, entityName, includeSigla, false);
+                            return `<li class="p-3 transition-colors hover:bg-slate-200/50 border-l-4 border-transparent flex justify-between items-center py-3">
+                                <div class="flex items-center gap-2 min-w-0"><span class="font-medium text-slate-700 text-base truncate">${item.name}</span>${includeSigla && item.sigla ? `<span class="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-xs font-bold flex-shrink-0">${item.sigla}</span>` : ''}</div>
+                                ${state.isAdmin ? `<div class="flex items-center gap-2 opacity-80 flex-shrink-0 ml-2">
+                                    <button onclick="startEditRow('${item.id}')" class="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                                    <button onclick="requestDeleteRow('${item.id}', '${collectionKey}', '${entityName}')" class="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                </div>` : ''}
+                            </li>`;
+                        }).join('')}
+                    </ul>
+                </div>
+            `;
+            if (document.getElementById('editNameInput') && !state.tempName) document.getElementById('editNameInput').focus();
+        }
+
+        function renderInlineRow(item, entityName, includeSigla, isNew) {
+            return `
+            <li class="p-3 bg-blue-50/50 border-l-4 border-blue-500 animate-in fade-in slide-in-from-top-2">
+                <div class="flex items-end gap-2">
+                    <div class="flex-1 flex gap-2 sm:gap-4 min-w-0">
+                        <div class="flex-1 min-w-0"><label class="text-xs font-bold text-navy mb-1 block uppercase truncate">${entityName}</label><input id="editNameInput" oninput="state.tempName = this.value" value="${isNew ? state.tempName : (state.tempName !== '' ? state.tempName : item?.name)}" class="w-full p-2 text-sm border border-blue-300 rounded outline-none focus:ring-2 focus:ring-blue-200" placeholder="Nome..."></div>
+                        ${includeSigla ? `<div class="w-20 sm:w-24 flex-shrink-0"><label class="text-xs font-bold text-navy mb-1 block uppercase">Sigla</label><input oninput="state.tempSigla = this.value.toUpperCase()" value="${isNew ? state.tempSigla : (state.tempSigla !== '' ? state.tempSigla : item?.sigla)}" class="w-full p-2 text-sm border border-blue-300 rounded outline-none uppercase focus:ring-2 focus:ring-blue-200" placeholder="SIGLA" maxlength="5"></div>` : ''}
+                    </div>
+                    <div class="flex items-center gap-1 mb-0.5 flex-shrink-0">
+                        <button onclick="saveGenericRow('${isNew ? '' : item.id}', '${includeSigla}')" class="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200"><i data-lucide="check" class="w-5 h-5"></i></button>
+                        <button onclick="cancelGenericEdit()" class="p-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                </div>
+            </li>`;
+        }
+
+        window.startCreateRow = () => { if (!state.isAdmin) return showLoginModal(); state.isCreatingRow = true; state.editingRowId = null; state.tempName = ''; state.tempSigla = ''; renderApp(); };
+        window.startEditRow = (id) => { if (!state.isAdmin) return showLoginModal(); const collectionKey = window.getCollectionKeyByScreen(state.currentScreen); const item = state[collectionKey].find(i => i.id === id); state.isCreatingRow = false; state.editingRowId = id; state.tempName = item.name; state.tempSigla = item.sigla || ''; renderApp(); };
+        window.cancelGenericEdit = () => { state.isCreatingRow = false; state.editingRowId = null; state.tempName = ''; state.tempSigla = ''; renderApp(); };
+        
+        window.saveGenericRow = async (id, includeSiglaStr) => {
+            const includeSigla = includeSiglaStr === 'true';
+            const collectionKey = window.getCollectionKeyByScreen(state.currentScreen);
+            const list = state[collectionKey];
+            const name = state.tempName.trim();
+            const sigla = state.tempSigla.trim();
+
+            if (!name) return alert('Nome obrigatório.');
+            if (includeSigla && !sigla) return alert('Sigla obrigatória.');
+
+            // Duplicate Check
+            const duplicate = list.find(i => i.name.trim().toLowerCase() === name.toLowerCase() && i.id !== id);
+            if(duplicate) return alert(`Já existe um registro com o nome "${name}"`);
+
+            try {
+                if (id) await updateDoc(doc(db, collectionKey, id), { name, ...(includeSigla ? {sigla} : {}) });
+                else await addDoc(collection(db, collectionKey), { name, ...(includeSigla ? {sigla} : {}) });
+                cancelGenericEdit();
+            } catch (error) { alert("Erro ao salvar. Verifique permissões."); }
+        };
+
+        window.requestDeleteRow = (id, key, name) => {
+             if (!state.isAdmin) return showLoginModal();
+             showConfirmModal(`Excluir ${name}`, `Tem certeza?`, async () => { try { await deleteDoc(doc(db, key, id)); } catch (e) { alert("Erro ao excluir."); } });
+        };
+        window.getCollectionKeyByScreen = (s) => s === 'types' ? 'types' : (s === 'locations' ? 'locations' : 'attendants');
+
+        // --- EVENT FORM ---
+        function renderEventForm() {
+            let container = document.getElementById('event-form-container');
+            const isEditing = !!state.editingEventId;
+            const isReadOnly = !state.isAdmin; // Non-admins are always read-only
+
+            let event = isEditing ? state.events.find(e => e.id === state.editingEventId) : { date: new Date().toISOString().split('T')[0], time: '08:00', locationId: '', typeId: '', attendantId: '' };
+            if (!container) {
+                appElement.innerHTML = '';
+                container = document.createElement('div');
+                container.id = 'event-form-container';
+                container.className = "flex flex-col h-screen overflow-y-auto bg-slate-100 pb-8 relative";
+                container.innerHTML = `
+                    <div class="bg-navy text-white p-4 sticky top-0 z-10 shadow-lg shadow-blue-900/10 flex items-center gap-3">
+                        <button onclick="navigateTo('home')" class="p-1 hover:bg-white/10 rounded-full transition-colors"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
+                        <h1 class="text-lg font-bold uppercase tracking-wide" id="form-title"></h1>
+                    </div>
+                    <div class="p-4 sm:p-6 max-w-xl mx-auto w-full flex flex-col gap-6">
+                        
+                        <!-- REMOVED SEARCH BLOCK HERE -->
+
+                        <div class="bg-slate-50 rounded-xl shadow-md shadow-slate-200 border border-slate-200 overflow-hidden w-full p-4 sm:p-6 flex flex-col gap-5">
+                             <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                                <div class="flex flex-col gap-1 w-full"><label class="text-base font-bold ml-1 text-navy">Data</label><input type="date" id="evtDate" class="w-full p-3 border border-slate-300 bg-white rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:border-navy focus:ring-navy/20 transition-all shadow-sm"></div>
+                                <div class="flex flex-col gap-1 w-full"><label class="text-base font-bold ml-1 text-navy">Hora</label><input type="time" id="evtTime" class="w-full p-3 border border-slate-300 bg-white rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:border-navy focus:ring-navy/20 transition-all shadow-sm"></div>
+                             </div>
+                             <div class="flex flex-col gap-1 w-full"><label class="text-base font-bold ml-1 text-navy">Localidade</label><select id="evtLoc" class="w-full p-3 border border-slate-300 bg-white rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:border-navy focus:ring-navy/20 transition-all shadow-sm"></select></div>
+                             <div class="flex flex-col gap-1 w-full"><label class="text-base font-bold ml-1 text-navy">Tipo de Evento</label><select id="evtType" class="w-full p-3 border border-slate-300 bg-white rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:border-navy focus:ring-navy/20 transition-all shadow-sm"></select></div>
+                             <div class="flex flex-col gap-1 w-full"><label class="text-base font-bold ml-1 text-navy">Atendente</label><select id="evtAtt" class="w-full p-3 border border-slate-300 bg-white rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:border-navy focus:ring-navy/20 transition-all shadow-sm"></select></div>
+                             <div class="mt-4 sm:mt-6 flex flex-col gap-3" id="form-actions">
+                                <button onclick="saveEvent()" class="flex items-center justify-center px-4 py-3 rounded-lg font-medium transition-all duration-200 active:scale-95 shadow-lg shadow-blue-900/10 border border-navy bg-navy text-white hover:bg-navy-dark">Salvar Evento</button>
+                                <button id="btn-delete-event" class="flex items-center justify-center px-4 py-3 rounded-lg font-medium transition-all duration-200 active:scale-95 shadow-none border border-transparent bg-transparent text-red-600 hover:bg-red-50 hover:text-red-700 hidden">Excluir Evento</button>
+                             </div>
+                        </div>
+                    </div>`;
+                appElement.appendChild(container);
+            }
+
+            // Title Logic
+            let displayTitle = '';
+            if (state.isAdmin) {
+                displayTitle = isEditing ? 'Alteração de Evento' : 'Cadastro de Evento';
+            } else {
+                displayTitle = 'Eventos Cadastrados';
+            }
+            document.getElementById('form-title').innerText = displayTitle;
+            
+            // Fields State (Disable if Read Only)
+            const disableFields = isReadOnly ? true : false;
+            document.getElementById('evtDate').disabled = disableFields;
+            document.getElementById('evtTime').disabled = disableFields;
+            document.getElementById('evtLoc').disabled = disableFields;
+            document.getElementById('evtType').disabled = disableFields;
+            document.getElementById('evtAtt').disabled = disableFields;
+            
+            // Hide Actions if Read Only
+            const actionsDiv = document.getElementById('form-actions');
+            if (isReadOnly) {
+                actionsDiv.style.display = 'none';
+                actionsDiv.classList.add('hidden');
+            } else {
+                actionsDiv.style.display = 'flex';
+                actionsDiv.classList.remove('hidden');
+            }
+
+            // Delete Button Visibility (Only for Admins when editing)
+            const delBtn = document.getElementById('btn-delete-event');
+            
+            // CORREÇÃO CRÍTICA: Vincular o evento deleteEvent diretamente via JS para garantir escopo
+            delBtn.onclick = window.deleteEvent;
+
+            if(isEditing && state.isAdmin) {
+                delBtn.classList.remove('hidden'); 
+            } else {
+                delBtn.classList.add('hidden');
+            }
+
+            // Populate Data
+            document.getElementById('evtDate').value = event?.date || '';
+            document.getElementById('evtTime').value = event?.time || '';
+            document.getElementById('evtLoc').innerHTML = `<option value="">Selecione...</option>` + state.locations.map(l => `<option value="${l.id}" ${l.id === event?.locationId ? 'selected' : ''}>${l.name}</option>`).join('');
+            document.getElementById('evtType').innerHTML = `<option value="">Selecione...</option>` + state.types.map(t => `<option value="${t.id}" ${t.id === event?.typeId ? 'selected' : ''}>${t.name} ${t.sigla ? `(${t.sigla})` : ''}</option>`).join('');
+            document.getElementById('evtAtt').innerHTML = `<option value="">Selecione...</option>` + state.attendants.map(a => `<option value="${a.id}" ${a.id === event?.attendantId ? 'selected' : ''}>${a.name}</option>`).join('');
+        }
+
+        window.selectEventFromSearch = (id) => {
+            state.editingEventId = id;
+            state.searchTerm = '';
+            // Proxy handles re-render
+        };
+
+        window.cancelEventEdit = () => { state.editingEventId = null; state.searchTerm = ''; renderApp(); };
+        window.saveEvent = async () => {
+            const date = document.getElementById('evtDate').value;
+            const time = document.getElementById('evtTime').value;
+            const locationId = document.getElementById('evtLoc').value;
+            const typeId = document.getElementById('evtType').value;
+            const attendantId = document.getElementById('evtAtt').value;
+
+            if (!date || !time || !locationId || !typeId || !attendantId) return alert('Todos os campos são obrigatórios.');
+
+            // Duplicate Check (Exclude self if editing)
+            const duplicate = state.events.find(e => 
+                e.id !== state.editingEventId &&
+                e.date === date && e.time === time && e.locationId === locationId && e.typeId === typeId && e.attendantId === attendantId
+            );
+
+            if (duplicate) return showDuplicateModal('Evento Duplicado', 'Já existe um evento idêntico.', '', '', () => openEditEvent(duplicate.id));
+
+            try {
+                if (state.editingEventId) await updateDoc(doc(db, "agenda", state.editingEventId), { date, time, locationId, typeId, attendantId });
+                else await addDoc(collection(db, "agenda"), { date, time, locationId, typeId, attendantId });
+                
+                // NOVO: Define os filtros para mostrar o evento editado/criado
+                state.selectedDate = date;
+                state.filterStartDate = date;
+                state.filterEndDate = date;
+                state.viewDate = new Date(date + 'T00:00:00');
+                state.searchTerm = ''; // Limpa busca textual para garantir visibilidade
+
+                state.editingEventId = null; 
+                navigateTo('home');
+            } catch (error) { alert("Erro ao salvar. Verifique permissões."); }
+        };
+
+        window.deleteEvent = () => {
+             if (!state.isAdmin) return alert("Apenas administradores podem excluir.");
+             
+             // Capturar ID imediatamente para evitar perda de referência no callback
+             const idToDelete = state.editingEventId;
+             if (!idToDelete) return alert("Erro: ID do evento não encontrado.");
+
+             showConfirmModal('Excluir Evento', 'Tem certeza que deseja excluir este evento?', async () => {
+                try {
+                    await deleteDoc(doc(db, "agenda", idToDelete));
+                    state.editingEventId = null; 
+                    navigateTo('home');
+                } catch (error) { 
+                    console.error("Erro ao excluir:", error);
+                    alert("Erro ao excluir: " + error.message); 
+                }
+            });
+        };
+
+        // --- PREVENT APP EXIT ---
+        window.addEventListener('beforeunload', (e) => {
+            e.preventDefault();
+            e.returnValue = 'Tem certeza que deseja sair?';
+            return 'Tem certeza que deseja sair?';
+        });
+
+        renderApp();
+    </script>
+</body>
+</html>
