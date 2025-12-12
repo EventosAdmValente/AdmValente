@@ -409,6 +409,7 @@
         }
 
         // Inicializar histórico
+        history.pushState({ screen: 'home' }, '', '');
         history.replaceState({ screen: 'home' }, '', '');
 
         // Função interna de navegação (sem manipular histórico)
