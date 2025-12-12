@@ -1033,24 +1033,77 @@
             });
         };
         renderApp();
-    </script>
-
+    
     // função para sair do app
     
-    function showExitDialog() {
+   function ensureInitialHistory() {
+    // Garante que não vamos empurrar estados duplicados várias vezes
+    if (!window.__app_history_initialized) {
+        try {
+            history.pushState({ screen: 'home' }, '', '');
+            // Não usar replaceState aqui — manter simples
+        } catch(e) {}
+        window.__app_history_initialized = true;
+    }
+}
+
+function tryExitApp() {
+    // 1) Tenta sair pelo histórico — calcula um salto grande para garantir saída
+    try {
+        const steps = -Math.max(3, window.history.length || 3);
+        history.go(steps);
+    } catch (e) {}
+
+    // 2) Se após 300ms ainda estamos aqui, tenta window.close() (funciona em alguns PWAs/WebViews)
+    setTimeout(() => {
+        try {
+            window.open('', '_self'); // prepara self-close
+            window.close();
+        } catch (e) {}
+    }, 300);
+
+    // 3) Se ainda não saiu (fallback), navega para uma página neutra (about:blank) para simular saída
+    setTimeout(() => {
+        try {
+            location.href = 'about:blank';
+        } catch (e) {
+            // último recurso: redirecionar para google — visível mas força sair do contexto do app
+            location.href = 'https://www.google.com/';
+        }
+    }, 700);
+}
+
+function showExitDialog() {
+    ensureInitialHistory();
+
     const dialog = document.getElementById("exitDialog");
+    if (!dialog) {
+        // Se por algum motivo o modal não existir, faz fallback direto
+        tryExitApp();
+        return;
+    }
+
     dialog.style.display = "flex";
 
+    // Cancelar
     document.getElementById("exitCancel").onclick = () => {
         dialog.style.display = "none";
-        history.pushState({ screen: 'home' }, "", "");
+        // Recoloca um estado para manter trap
+        try { history.pushState({ screen: 'home' }, "", ""); } catch(e){}
     };
 
+    // Confirmar = sair
     document.getElementById("exitConfirm").onclick = () => {
-    dialog.style.display = "none";
-    history.go(-3); // Sai do app imediatamente
-};
+        dialog.style.display = "none";
+        // Executa várias estratégias de saída
+        tryExitApp();
+    };
 }
+    
+    
+    </script>
+
+    
 
     // Código de saída do App
     
