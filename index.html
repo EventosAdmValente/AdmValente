@@ -74,20 +74,13 @@
     "firebase/app": "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js",
     "firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js",
     "firebase/auth": "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js",
-    "react": "https://esm.sh/react@^19.2.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
-    "react/": "https://esm.sh/react@^19.2.1/",
-    "firebase/": "https://esm.sh/firebase@^12.6.0/"
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "firebase/": "https://esm.sh/firebase@^12.6.0/",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
   }
 }
 </script>
-
-<link rel="manifest" href="./manifest.json">
-<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
-<meta name="theme-color" content="#003366">
-
 </head>
 <body class="h-screen w-full flex flex-col">
 
@@ -202,7 +195,8 @@
         // --- 2. FIREBASE LISTENERS ---
 
         onAuthStateChanged(auth, (user) => {
-            state.user = user;
+            // Fix: Store only plain user data to avoid circular JSON errors
+            state.user = user ? { uid: user.uid, email: user.email } : null;
             state.isAdmin = user && user.uid === ADMIN_UID;
             console.log("Auth State:", user ? "Logged In" : "Logged Out", "Is Admin:", state.isAdmin);
             renderApp();
@@ -353,7 +347,8 @@
             document.getElementById('modal-locate-btn').onclick = () => { onLocate(); closeModal(); };
         }
 
-        // --- NAVIGATION ---
+        // --- NAVIGATION & HISTORY ---
+        
         const renderNavMenu = () => {
             if (!state.isMenuOpen) return '';
             
@@ -402,7 +397,11 @@
             `;
         }
 
-        window.navigateTo = (screen) => {
+        // Inicializar histórico
+        history.replaceState({ screen: 'home' }, '', '');
+
+        // Função interna de navegação (sem manipular histórico)
+        const internalNavigateTo = (screen) => {
             state.isMenuOpen = false;
             state.currentScreen = screen;
             state.editingRowId = null;
@@ -411,7 +410,63 @@
             state.tempSigla = '';
             state.managerSearchTerm = '';
             renderApp();
+        };
+
+        // Função pública de navegação (empurra histórico)
+        window.navigateTo = (screen) => {
+            if (state.currentScreen === screen) {
+                state.isMenuOpen = false;
+                renderApp();
+                return;
+            }
+            history.pushState({ screen: screen }, '', '');
+            internalNavigateTo(screen);
         }
+
+        // Listener do Botão Voltar (History API)
+        window.addEventListener('popstate', (event) => {
+            // Se o menu estiver aberto, fecha e mantém estado
+            if (state.isMenuOpen) {
+                 state.isMenuOpen = false;
+                 // Empurra de volta pq o 'voltar' removeu, mas só queríamos fechar o menu
+                 history.pushState({ screen: state.currentScreen }, '', ''); 
+                 renderApp();
+                 return;
+            }
+
+            // Se existe estado no evento (navegação interna)
+            if (event.state && event.state.screen) {
+                internalNavigateTo(event.state.screen);
+            } else {
+                // Se estamos na Home e o usuário tenta sair
+                if (state.currentScreen === 'home') {
+                    // Prende o usuário empurrando o estado novamente
+                    history.pushState({ screen: 'home' }, '', '');
+                    
+                    showConfirmModal("Sair do App", "Deseja realmente sair da aplicação?", () => {
+                        // Tenta voltar duas vezes para passar pelo 'trap' e sair
+                        history.go(-2); 
+                        // Fallback: Tenta fechar a janela
+                        try { window.close(); } catch(e){}
+                    });
+                    
+                    // Customiza o botão do modal
+                    setTimeout(() => {
+                        const btn = document.getElementById('modal-confirm-btn');
+                        if(btn) {
+                            btn.innerText = "Sair";
+                            btn.classList.remove('bg-red-600', 'hover:bg-red-700', 'shadow-red-600/20');
+                            btn.classList.add('bg-slate-800', 'hover:bg-slate-900', 'shadow-slate-800/20');
+                        }
+                    }, 50);
+                } 
+                // Se estávamos em sub-tela mas perdemos o estado (refresh), volta pra home
+                else {
+                    internalNavigateTo('home');
+                    history.replaceState({ screen: 'home' }, '', '');
+                }
+            }
+        });
 
         // --- HOME SCREEN ---
         function renderHome() {
@@ -985,12 +1040,5 @@
 
         renderApp();
     </script>
-
-<script>
-if("serviceWorker" in navigator){
- navigator.serviceWorker.register("./sw.js");
-}
-</script>
-
 </body>
 </html>
