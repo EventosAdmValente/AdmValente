@@ -1046,15 +1046,21 @@
                 }
             });
         };
-
-        // --- PREVENT APP EXIT ---
-        window.addEventListener('beforeunload', (e) => {
-            e.preventDefault();
-            e.returnValue = 'Tem certeza que deseja sair?';
-            return 'Tem certeza que deseja sair?';
-        });
-
         renderApp();
     </script>
+    
+    // --- PREVENT APP EXIT ---
+    
+    <script>    
+        history.pushState(null, "", window.location.href);    
+        window.addEventListener("popstate", function () {
+        const sair = confirm("Tem certeza que deseja sair do aplicativo?");
+        if (sair) {
+          history.back();
+        } else {
+          history.pushState(null, "", window.location.href);
+        }
+      });
+</script>
 </body>
 </html>
