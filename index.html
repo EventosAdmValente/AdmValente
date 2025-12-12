@@ -451,14 +451,11 @@
                 internalNavigateTo(event.state.screen);
             } else {
                 // Se estamos na Home e o usuário tenta sair
-                if (state.currentScreen === 'home') {
-                    const sair = confirm("Deseja realmente sair da Agenda?");        
-                    
+                    if (state.currentScreen === 'home') {
                     showExitDialog();
                     return;
-                        
-                        }
-                else {
+                }
+                    else {
                     internalNavigateTo('home');
                     history.replaceState({ screen: 'home' }, '', '');
                 }
