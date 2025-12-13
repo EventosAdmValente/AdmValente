@@ -349,7 +349,6 @@
         // Assim, quando o usuário voltar de 'home', ele cai em 'root' e disparamos o modal.
         window.addEventListener('load', () => {
             history.replaceState({ screen: 'root' }, '', '');
-            history.pushState({ screen: 'home' }, '', '');
             renderApp();
         });
 
@@ -436,23 +435,20 @@
         // --- GERENCIAMENTO DE VOLTAR / POPSTATE ---
        window.addEventListener('popstate', (event) => {
 
-            // 1️⃣ Se menu estiver aberto, fecha
+            // Fecha menu se estiver aberto
             if (state.isMenuOpen) {
                 state.isMenuOpen = false;
                 renderApp();
                 return;
             }
         
-            // 2️⃣ 🔔 AQUI entra o BackHandler
-            const handled = BackHandler.onBack(state.currentScreen);
-            if (handled) return;
-        
-            // 3️⃣ Navegação normal
+            // Navegação normal pelo histórico
             if (event.state && event.state.screen) {
                 internalNavigateTo(event.state.screen);
-            } else {
-                internalNavigateTo('home');
+                return;
             }
+        
+            // Se não houver mais histórico, o sistema sai do app
     });
 
         // --- HOME SCREEN ---
