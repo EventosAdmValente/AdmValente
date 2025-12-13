@@ -71,13 +71,11 @@
   }
 }
 </script>
-    <script>
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log('Service Worker registrado'))
-        .catch(err => console.error('Erro no SW', err));
-        }
-    </script>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
+    <meta name="theme-color" content="#003366">
 </head>
 <body class="h-screen w-full flex flex-col bg-slate-100">
 
@@ -121,7 +119,7 @@
 
     <script type="module">
         import { initializeApp, getApps, getApp } from "firebase/app";
-        import { getFirestore, enableIndexedDbPersistence, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy} from "firebase/firestore";
+        import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
         // --- CONFIGURAÇÃO FIREBASE ---
@@ -139,13 +137,6 @@
         const appInfo = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
         const db = getFirestore(appInfo);
         const auth = getAuth(appInfo);
-        enableIndexedDbPersistence(db).catch((err) => {
-        if (err.code === 'failed-precondition') {
-            console.warn('Persistência offline falhou: múltiplas abas abertas');
-        } else if (err.code === 'unimplemented') {
-            console.warn('Navegador não suporta persistência offline');
-        }
-        });
 
         // --- ESTADO DA APLICAÇÃO ---
         const INITIAL_STATE = {
