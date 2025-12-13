@@ -1,122 +1,26 @@
 /* back-handler.js
- * Controle do botão VOLTAR
- * - Telas internas: deixa o app tratar
- * - Home: abre modal de saída
+ * Comportamento simples:
+ * - Telas internas: volta normalmente
+ * - Home: próximo back sai do app
  */
 
 (function () {
 
-    let modalOpen = false;
-    let exitArmed = false;
+    const HOME = 'home';
 
-    const config = {
-        homeScreen: 'home',
-        exitMessage: 'Deseja sair do aplicativo?'
-    };
-
-    function exitApp() {
-    // No Android Web/PWA não é permitido fechar o app.
-    // Armamos a saída para o próximo botão voltar.
-    exitArmed = true;
-    }
-    
-        // Navegador → sai do app sem tela branca
-        location.replace(document.referrer || '/');
-    }
-
-    function createModal() {
-        if (document.getElementById('bh-exit-modal')) return;
-
-        const overlay = document.createElement('div');
-        overlay.id = 'bh-exit-modal';
-        overlay.style.cssText = `
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.45);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 99999;
-        `;
-
-        overlay.innerHTML = `
-            <div style="
-                background: #fff;
-                padding: 20px;
-                border-radius: 14px;
-                width: 80%;
-                max-width: 300px;
-                text-align: center;
-                font-size: 16px;
-            ">
-                <p style="margin-bottom: 20px;">${config.exitMessage}</p>
-
-                <button id="bh-cancel"
-                    style="
-                        padding: 10px 20px;
-                        border: none;
-                        border-radius: 8px;
-                        background: #ccc;
-                        margin-right: 10px;
-                    ">
-                    Cancelar
-                </button>
-
-                <button id="bh-ok"
-                    style="
-                        padding: 10px 20px;
-                        border: none;
-                        border-radius: 8px;
-                        background: #e53935;
-                        color: #fff;
-                    ">
-                    OK
-                </button>
-            </div>
-        `;
-
-        document.body.appendChild(overlay);
-
-        // CANCELAR → apenas fecha o modal
-        document.getElementById('bh-cancel').onclick = () => {
-            overlay.style.display = 'none';
-            modalOpen = false;
-        };
-
-        // OK → sai imediatamente
-        document.getElementById('bh-ok').onclick = () => {
-            modal.style.display = 'none';
-            modalOpen = false;
-            exitApp();
-        };
-    }
-
-    function openModal() {
-        if (modalOpen) return;
-
-        createModal();
-        const modal = document.getElementById('bh-exit-modal');
-        modal.style.display = 'flex';
-        modalOpen = true;
-    }
-
-    // API pública
     window.BackHandler = {
 
         onBack(currentScreen) {
+            // Se NÃO estiver na home, deixa o app tratar
+            if (currentScreen !== HOME) {
+                return false;
+            }
 
-    // Se a saída estiver armada, deixa o navegador sair
-    if (exitArmed) {
-        return false;
+            // Se estiver na home, NÃO intercepta
+            // O próximo back será tratado pelo navegador/sistema
+            return false;
         }
 
-    if (currentScreen === config.homeScreen) {
-        openModal();
-        return true;
-        }
-
-    return false;
-    }    
     };
 
 })();
