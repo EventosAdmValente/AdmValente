@@ -436,25 +436,21 @@
         // --- GERENCIAMENTO DE VOLTAR / POPSTATE ---
         window.addEventListener('popstate', (event) => {
 
-    // Se o menu estiver aberto, fecha ele
-    if (state.isMenuOpen) {
-        state.isMenuOpen = false;
-        history.pushState({ screen: state.currentScreen }, '', '');
-        renderApp();
-        return;
-    }
-
-    // 🔹 Back handler (verifica se é a tela home)
-    const handled = BackHandler.onBack(state.currentScreen);
-    if (handled) return; // Se BackHandler tratou o evento, não faz mais nada
-
-    // 🔹 Navegação normal (se não for a tela home)
-    if (event.state && event.state.screen) {
-        internalNavigateTo(event.state.screen);
-    } else {
-        internalNavigateTo('home');
-        history.replaceState({ screen: 'home' }, '', '');
-    }
+        // Fecha menu se estiver aberto
+        if (state.isMenuOpen) {
+            state.isMenuOpen = false;
+            history.pushState({ screen: state.currentScreen }, '', '');
+            renderApp();
+            return;
+        }
+    
+        // Deixa o histórico mandar
+        if (event.state && event.state.screen) {
+            internalNavigateTo(event.state.screen);
+            return;
+        }
+    
+        // Se não houver mais estado, o navegador sai do app
 });
 
         // --- HOME SCREEN ---
