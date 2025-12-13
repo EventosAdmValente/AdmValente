@@ -1,32 +1,29 @@
 /* back-handler.js
  * Controle do botão VOLTAR
- * Home → modal de saída
- * Outras telas → navegação normal
+ * - Telas internas: deixa o app tratar
+ * - Home: abre modal de saída
  */
 
 (function () {
-    let isShowingExitModal = false;
 
-    let config = {
+    let modalOpen = false;
+
+    const config = {
         homeScreen: 'home',
-        exitMessage: 'Deseja sair do aplicativo?',
-        onExit: defaultExit
+        exitMessage: 'Deseja sair do aplicativo?'
     };
 
-    function defaultExit() {
-        try {
-            location.href = 'about:blank';
-        } catch (e) {
-            history.go(-1);
-        }
+    function exitApp() {
+        // Forma mais confiável permitida em Web / PWA
+        window.location.href = 'about:blank';
     }
 
-    function createExitModal() {
+    function createModal() {
         if (document.getElementById('bh-exit-modal')) return;
 
-        const modal = document.createElement('div');
-        modal.id = 'bh-exit-modal';
-        modal.style.cssText = `
+        const overlay = document.createElement('div');
+        overlay.id = 'bh-exit-modal';
+        overlay.style.cssText = `
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.45);
@@ -36,7 +33,7 @@
             z-index: 99999;
         `;
 
-        modal.innerHTML = `
+        overlay.innerHTML = `
             <div style="
                 background: #fff;
                 padding: 20px;
@@ -47,58 +44,65 @@
                 font-size: 16px;
             ">
                 <p style="margin-bottom: 20px;">${config.exitMessage}</p>
-                <button id="bh-cancel" style="
-                    padding: 10px 20px;
-                    margin-right: 10px;
-                    border: none;
-                    border-radius: 8px;
-                    background: #ccc;
-                ">Cancelar</button>
-                <button id="bh-ok" style="
-                    padding: 10px 20px;
-                    border: none;
-                    border-radius: 8px;
-                    background: #e53935;
-                    color: #fff;
-                ">OK</button>
+
+                <button id="bh-cancel"
+                    style="
+                        padding: 10px 20px;
+                        border: none;
+                        border-radius: 8px;
+                        background: #ccc;
+                        margin-right: 10px;
+                    ">
+                    Cancelar
+                </button>
+
+                <button id="bh-ok"
+                    style="
+                        padding: 10px 20px;
+                        border: none;
+                        border-radius: 8px;
+                        background: #e53935;
+                        color: #fff;
+                    ">
+                    OK
+                </button>
             </div>
         `;
 
-        document.body.appendChild(modal);
+        document.body.appendChild(overlay);
 
+        // CANCELAR → apenas fecha o modal
         document.getElementById('bh-cancel').onclick = () => {
-            modal.style.display = 'none';
-            isShowingExitModal = false;
-            history.pushState({ screen: config.homeScreen }, '', '');
+            overlay.style.display = 'none';
+            modalOpen = false;
         };
 
+        // OK → sai imediatamente
         document.getElementById('bh-ok').onclick = () => {
-            modal.style.display = 'none';
-            isShowingExitModal = false;
-            config.onExit();
+            exitApp();
         };
     }
 
-    function showExitModal() {
-        createExitModal();
+    function openModal() {
+        if (modalOpen) return;
+
+        createModal();
         const modal = document.getElementById('bh-exit-modal');
         modal.style.display = 'flex';
-        isShowingExitModal = true;
+        modalOpen = true;
     }
 
+    // API pública
     window.BackHandler = {
-        configure(options = {}) {
-            config = { ...config, ...options };
-        },
 
         onBack(currentScreen) {
             if (currentScreen === config.homeScreen) {
-                if (!isShowingExitModal) {
-                    showExitModal();
-                }
-                return true;
+                openModal();
+                return true; // evento tratado
             }
-            return false;
+
+            return false; // deixa o app tratar
         }
     };
+
 })();
