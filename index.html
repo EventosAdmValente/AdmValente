@@ -401,8 +401,9 @@
             `;
         }
 
-        // Inicializar histórico
-        history.replaceState({ screen: 'home' }, '', '');
+        // Inicializar histórico - Usamos pushState para criar uma entrada na pilha
+        // Isso é crucial para que o botão voltar na home dispare o popstate sem sair do site imediatamente
+        history.pushState({ screen: 'home' }, '', '');
 
         // Função interna de navegação (sem manipular histórico)
         const internalNavigateTo = (screen) => {
@@ -442,17 +443,19 @@
             if (event.state && event.state.screen) {
                 internalNavigateTo(event.state.screen);
             } else {
-                // Estamos tentando voltar além da Home (ou o state é null/home)
+                // Estamos tentando voltar a partir da Home (ou o state é null mas estamos na home)
                 if (state.currentScreen === 'home') {
-                    // Prende o usuário empurrando o estado novamente para não sair da página
+                    // TRAP: Empurra o estado de volta para impedir a saída do navegador
                     history.pushState({ screen: 'home' }, '', '');
                     
                     const html = `
                         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in">
-                            <p class="text-slate-600 text-center mb-6 font-medium text-lg pt-2">Deseja sair do app?</p>
+                            <div class="text-center mb-6 pt-2">
+                                <p class="text-slate-700 font-bold text-lg">Deseja sair da Agenda?</p>
+                            </div>
                             <div class="flex gap-3">
-                                <button onclick="closeModal()" class="flex-1 py-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold shadow-sm">Cancelar</button>
-                                <button onclick="window.close()" class="flex-1 py-3 rounded-lg bg-navy text-white hover:bg-navy-dark font-bold shadow-md shadow-blue-900/20">OK</button>
+                                <button onclick="closeModal()" class="flex-1 py-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">Cancelar</button>
+                                <button onclick="try{window.close()}catch(e){}" class="flex-1 py-3 rounded-lg bg-navy text-white hover:bg-navy-dark font-bold shadow-lg shadow-blue-900/20">OK</button>
                             </div>
                         </div>
                     `;
