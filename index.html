@@ -15,6 +15,10 @@
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- JSPDF & AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     
     <style>
         body {
@@ -224,6 +228,189 @@
             return new Date(`${date}T${time}`) < new Date();
         }
 
+        // --- HELPER DE FILTRO (REUTILIZÁVEL) ---
+        function getFilteredEvents() {
+            const lowerTerm = state.searchTerm.toLowerCase();
+            return state.events.filter(e => {
+                const type = state.types.find(t => t.id === e.typeId);
+                const loc = state.locations.find(l => l.id === e.locationId);
+                const att = state.attendants.find(a => a.id === e.attendantId);
+                const matchesSearch = !state.searchTerm || (type?.name.toLowerCase().includes(lowerTerm)) || (type?.sigla?.toLowerCase().includes(lowerTerm)) || (loc?.name.toLowerCase().includes(lowerTerm)) || (att?.name.toLowerCase().includes(lowerTerm));
+                let matchesDate = true;
+                if (state.selectedDate) matchesDate = e.date === state.selectedDate;
+                else if (state.filterStartDate || state.filterEndDate) {
+                    const start = state.filterStartDate || '0000-00-00';
+                    const end = state.filterEndDate || '9999-12-31';
+                    matchesDate = e.date >= start && e.date <= end;
+                }
+                return matchesSearch && matchesDate;
+            });
+        }
+
+        // --- HELPER DE DESCRIÇÃO DO FILTRO (PDF/PREVIEW) ---
+        function getFilterDescription(filteredEvents) {
+            if (!filteredEvents || filteredEvents.length === 0) return "Nenhum evento listado";
+            
+            // Ordenar por data para garantir min e max
+            const sortedDates = filteredEvents.map(e => e.date).sort();
+            const minDate = sortedDates[0];
+            const maxDate = sortedDates[sortedDates.length - 1];
+            
+            return `Eventos do dia ${formatDate(minDate)} ao dia ${formatDate(maxDate)}`;
+        }
+
+        // --- PREVIEW PDF (VISUALIZAÇÃO) ---
+        window.openPDFPreview = () => {
+            const filteredEvents = getFilteredEvents();
+            if (filteredEvents.length === 0) {
+                alert("Não há dados para exportar com os filtros atuais.");
+                return;
+            }
+
+            const filterText = getFilterDescription(filteredEvents);
+            const dateStr = new Date().toLocaleString('pt-BR');
+
+            // Gerar linhas da tabela HTML
+            const tableRows = filteredEvents.map(e => {
+                const type = state.types.find(t => t.id === e.typeId);
+                const loc = state.locations.find(l => l.id === e.locationId);
+                const att = state.attendants.find(a => a.id === e.attendantId);
+                return `
+                    <tr class="border-b border-slate-100 hover:bg-slate-50 text-sm text-slate-700">
+                        <td class="p-2 whitespace-nowrap font-medium">${formatDate(e.date)}</td>
+                        <td class="p-2 whitespace-nowrap">${e.time}</td>
+                        <td class="p-2 min-w-[150px]">${type?.name || 'N/A'}</td>
+                        <td class="p-2 whitespace-nowrap text-center">${type?.sigla || '-'}</td>
+                        <td class="p-2 min-w-[120px]">${loc?.name || 'N/A'}</td>
+                        <td class="p-2 min-w-[120px]">${att?.name || 'N/A'}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const html = `
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in">
+                    <!-- Cabeçalho Modal -->
+                    <div class="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center flex-shrink-0">
+                        <div class="flex flex-col">
+                            <h3 class="font-bold text-lg text-navy">Visualizar Relatório</h3>
+                            <span class="text-xs text-slate-500">Confira os dados antes de baixar</span>
+                        </div>
+                        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-6 h-6"></i></button>
+                    </div>
+
+                    <!-- Conteúdo com Scroll -->
+                    <div class="p-6 overflow-y-auto flex-1 bg-slate-100/50">
+                        <div class="bg-white p-6 shadow-sm border border-slate-200 min-w-full">
+                            <!-- Cabeçalho do Relatório (Simulado) -->
+                            <div class="text-center mb-6 border-b pb-4 border-slate-100">
+                                <h2 class="text-xl font-bold text-navy uppercase tracking-wide">Relatório de Eventos</h2>
+                                <h4 class="text-sm text-slate-500 font-medium mt-1">Adm Valente</h4>
+                                <div class="mt-2 text-xs text-slate-400">Gerado em: ${dateStr}</div>
+                                <div class="mt-1 text-xs font-bold text-slate-600 bg-slate-100 inline-block px-2 py-1 rounded">${filterText}</div>
+                            </div>
+                            
+                            <!-- Tabela Responsiva -->
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-navy text-white text-xs uppercase tracking-wider">
+                                            <th class="p-2 rounded-tl-lg">Data</th>
+                                            <th class="p-2">Hora</th>
+                                            <th class="p-2">Evento</th>
+                                            <th class="p-2 text-center">Sigla</th>
+                                            <th class="p-2">Local</th>
+                                            <th class="p-2 rounded-tr-lg">Atendente</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white">
+                                        ${tableRows}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-4 text-right text-xs text-slate-400 font-medium">Total de registros: ${filteredEvents.length}</div>
+                        </div>
+                    </div>
+
+                    <!-- Ações -->
+                    <div class="p-4 border-t border-slate-100 bg-white flex gap-3 flex-shrink-0">
+                        <button onclick="closeModal()" class="flex-1 py-3 rounded-lg text-slate-600 bg-slate-100 hover:bg-slate-200 font-bold transition-colors">Cancelar</button>
+                        <button onclick="confirmPDFDownload()" class="flex-1 py-3 rounded-lg bg-navy text-white hover:bg-navy-dark font-bold shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition-colors">
+                            <i data-lucide="download" class="w-4 h-4"></i> Baixar PDF
+                        </button>
+                    </div>
+                </div>
+            `;
+            window.showModal(html);
+        };
+
+        // --- GERAÇÃO FINAL DO PDF ---
+        window.confirmPDFDownload = () => {
+            const filteredEvents = getFilteredEvents();
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Preparar dados para o AutoTable
+            const tableData = filteredEvents.map(e => {
+                const type = state.types.find(t => t.id === e.typeId);
+                const loc = state.locations.find(l => l.id === e.locationId);
+                const att = state.attendants.find(a => a.id === e.attendantId);
+                return [
+                    formatDate(e.date),
+                    e.time,
+                    type?.name || 'N/A',
+                    type?.sigla || '',
+                    loc?.name || 'N/A',
+                    att?.name || 'N/A'
+                ];
+            });
+
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const dateStr = new Date().toLocaleString('pt-BR');
+            const filterText = getFilterDescription(filteredEvents);
+
+            // Cabeçalho Centralizado
+            doc.setFontSize(16);
+            doc.setTextColor(0, 51, 102); // Navy
+            doc.text("RELATÓRIO DE EVENTOS - ADM VALENTE", pageWidth / 2, 20, { align: 'center' });
+            
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`Gerado em: ${dateStr}`, pageWidth / 2, 26, { align: 'center' });
+            
+            doc.setFontSize(9);
+            doc.setTextColor(60);
+            doc.text(filterText, pageWidth / 2, 32, { align: 'center' });
+
+            // Gerar Tabela
+            doc.autoTable({
+                startY: 38,
+                head: [['Data', 'Hora', 'Evento', 'Sigla', 'Local', 'Atendente']],
+                body: tableData,
+                theme: 'striped',
+                headStyles: { 
+                    fillColor: [0, 51, 102], 
+                    halign: 'center',
+                    lineWidth: 0.1,
+                    lineColor: [200, 200, 200]
+                }, // Navy Blue
+                styles: { 
+                    fontSize: 10, 
+                    cellPadding: 3, 
+                    valign: 'middle',
+                    lineWidth: 0.1,
+                    lineColor: [200, 200, 200]
+                },
+                columnStyles: {
+                    0: { cellWidth: 22 }, // Data
+                    1: { cellWidth: 16 }, // Hora
+                    3: { cellWidth: 16, halign: 'center' }, // Sigla
+                }
+            });
+
+            doc.save(`agenda_valente_${new Date().toISOString().slice(0,10)}.pdf`);
+            closeModal();
+        };
+
         // --- NAV & DOM ---
         const appElement = document.getElementById('app');
         const modalContainer = document.getElementById('modal-container');
@@ -233,7 +420,6 @@
 
         // --- SISTEMA DE NAVEGAÇÃO NATIVA ---
         
-        // Inicializa o estado do histórico para suportar navegação
         window.addEventListener('load', () => {
             if (!history.state) {
                 history.replaceState({ screen: 'home' }, '', '');
@@ -247,7 +433,6 @@
                 renderApp();
                 return;
             }
-            // Adiciona nova entrada no histórico para a nova tela
             history.pushState({ screen: screen }, '', '');
             internalNavigateTo(screen);
         }
@@ -255,7 +440,6 @@
         const internalNavigateTo = (screen) => {
             state.isMenuOpen = false;
             state.currentScreen = screen;
-            // Resetar estados temporários
             state.editingRowId = null;
             state.isCreatingRow = false;
             state.tempName = '';
@@ -264,28 +448,18 @@
             renderApp();
         };
 
-        // Captura o evento de 'Voltar' do navegador/celular
         window.addEventListener('popstate', (event) => {
             const currentHistoryState = event.state;
-
-            // Se o menu estiver aberto, apenas o fechamos visualmente
-            // A navegação de URL já aconteceu, então sincronizamos a tela
-            if (state.isMenuOpen) {
-                 state.isMenuOpen = false;
-            }
-
-            // Se houver um estado definido no histórico, navega para ele
+            if (state.isMenuOpen) state.isMenuOpen = false;
             if (currentHistoryState && currentHistoryState.screen) {
                 internalNavigateTo(currentHistoryState.screen);
             } else {
-                // Se não houver estado (início do histórico), assume Home
                 internalNavigateTo('home');
             }
         });
 
         // --- RENDERIZAÇÃO PRINCIPAL ---
         window.renderApp = () => {
-            // Se modal de calendário estiver aberto, pausa renderização global para não perdê-lo
             if (document.getElementById('calendar-modal-content')) return;
 
             switch (state.currentScreen) {
@@ -359,8 +533,9 @@
                                 <div class="flex justify-between items-center mb-1">
                                     <label class="text-base font-bold text-navy ml-1">Pesquisar eventos</label>
                                     <div class="flex gap-2">
-                                        <button onclick="resetAllFilters()" class="flex items-center gap-1 px-3 py-1 bg-slate-200 text-slate-700 text-xs font-bold rounded hover:bg-slate-300 transition-colors shadow-sm"><i data-lucide="list" class="w-3 h-3"></i> Ver Todos</button>
-                                        <button onclick="startOpenAgenda()" class="flex items-center gap-1 px-3 py-1 bg-navy text-white text-xs font-bold rounded hover:bg-navy-dark transition-colors shadow-sm"><i data-lucide="calendar" class="w-3 h-3"></i> Agenda</button>
+                                        <button onclick="openPDFPreview()" class="flex items-center gap-1 px-3 py-1 bg-navy text-white border border-navy text-xs font-bold rounded hover:bg-navy-dark transition-colors shadow-sm"><i data-lucide="file-text" class="w-3 h-3"></i> PDF</button>
+                                        <button onclick="resetAllFilters()" class="flex items-center gap-1 px-3 py-1 bg-navy text-white border border-navy text-xs font-bold rounded hover:bg-navy-dark transition-colors shadow-sm"><i data-lucide="list" class="w-3 h-3"></i> Ver Todos</button>
+                                        <button onclick="startOpenAgenda()" class="flex items-center gap-1 px-3 py-1 bg-navy text-white border border-navy text-xs font-bold rounded hover:bg-navy-dark transition-colors shadow-sm"><i data-lucide="calendar" class="w-3 h-3"></i> Agenda</button>
                                     </div>
                                 </div>
                                 <div class="relative mt-1">
