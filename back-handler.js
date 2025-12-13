@@ -14,8 +14,16 @@
     };
 
     function exitApp() {
-        // Forma mais confiável permitida em Web / PWA
-        window.location.href = 'about:blank';
+        // 1) Tenta fechar a aba (funciona em PWA / WebView)
+        try {
+            window.open('', '_self');
+            window.close();
+        } catch (e) {}
+    
+        // 2) Fallback: volta no histórico para sair do site
+        try {
+            history.back();
+        } catch (e) {}
     }
 
     function createModal() {
