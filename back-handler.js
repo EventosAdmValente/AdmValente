@@ -1,65 +1,104 @@
-// back-handler.js
+/* back-handler.js
+ * Controle do botão VOLTAR
+ * Home → modal de saída
+ * Outras telas → navegação normal
+ */
+
 (function () {
+    let isShowingExitModal = false;
 
-  // Cria a pilha inicial de histórico
-  window.addEventListener("load", () => {
-    history.replaceState({ screen: "root" }, "", "");
-    history.pushState({ screen: "home" }, "", "");
-  });
-
-  function abrirModalSair() {
-    const html = `
-      <div id="exit-modal-content"
-           style="
-             background:#fff;
-             border-radius:12px;
-             padding:24px;
-             max-width:320px;
-             width:90%;
-             box-shadow:0 10px 30px rgba(0,0,0,.25);
-           ">
-        <p style="font-size:18px;font-weight:600;margin-bottom:24px;text-align:center">
-          Deseja sair do aplicativo?
-        </p>
-        <div style="display:flex;gap:12px">
-          <button id="exit-cancel"
-                  style="flex:1;padding:12px;border-radius:8px;border:none;background:#eee;font-weight:600">
-            Cancelar
-          </button>
-          <button id="exit-confirm"
-                  style="flex:1;padding:12px;border-radius:8px;border:none;background:#0a3cff;color:#fff;font-weight:600">
-            OK
-          </button>
-        </div>
-      </div>
-    `;
-
-    window.showModal(html);
-
-    document.getElementById("exit-cancel").onclick = () => {
-      window.closeModal();
-      history.pushState({ screen: "home" }, "", "");
+    let config = {
+        homeScreen: 'home',
+        exitMessage: 'Deseja sair do aplicativo?',
+        onExit: defaultExit
     };
 
-    document.getElementById("exit-confirm").onclick = () => {
-      // libera o histórico para o sistema fechar o app
-      history.back();
+    function defaultExit() {
+        try {
+            location.href = 'about:blank';
+        } catch (e) {
+            history.go(-1);
+        }
+    }
+
+    function createExitModal() {
+        if (document.getElementById('bh-exit-modal')) return;
+
+        const modal = document.createElement('div');
+        modal.id = 'bh-exit-modal';
+        modal.style.cssText = `
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+        `;
+
+        modal.innerHTML = `
+            <div style="
+                background: #fff;
+                padding: 20px;
+                border-radius: 14px;
+                width: 80%;
+                max-width: 300px;
+                text-align: center;
+                font-size: 16px;
+            ">
+                <p style="margin-bottom: 20px;">${config.exitMessage}</p>
+                <button id="bh-cancel" style="
+                    padding: 10px 20px;
+                    margin-right: 10px;
+                    border: none;
+                    border-radius: 8px;
+                    background: #ccc;
+                ">Cancelar</button>
+                <button id="bh-ok" style="
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 8px;
+                    background: #e53935;
+                    color: #fff;
+                ">OK</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('bh-cancel').onclick = () => {
+            modal.style.display = 'none';
+            isShowingExitModal = false;
+            history.pushState({ screen: config.homeScreen }, '', '');
+        };
+
+        document.getElementById('bh-ok').onclick = () => {
+            modal.style.display = 'none';
+            isShowingExitModal = false;
+            config.onExit();
+        };
+    }
+
+    function showExitModal() {
+        createExitModal();
+        const modal = document.getElementById('bh-exit-modal');
+        modal.style.display = 'flex';
+        isShowingExitModal = true;
+    }
+
+    window.BackHandler = {
+        configure(options = {}) {
+            config = { ...config, ...options };
+        },
+
+        onBack(currentScreen) {
+            if (currentScreen === config.homeScreen) {
+                if (!isShowingExitModal) {
+                    showExitModal();
+                }
+                return true;
+            }
+            return false;
+        }
     };
-  }
-
-  window.addEventListener("popstate", (event) => {
-
-    // Se estiver na HOME → perguntar se deseja sair
-    if (window.state?.currentScreen === "home") {
-      abrirModalSair();
-      return;
-    }
-
-    // Se estiver em outra tela → voltar para home
-    if (window.internalNavigateTo) {
-      window.internalNavigateTo("home");
-      history.pushState({ screen: "home" }, "", "");
-    }
-  });
-
 })();
