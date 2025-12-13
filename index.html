@@ -119,7 +119,7 @@
 
     <script type="module">
         import { initializeApp, getApps, getApp } from "firebase/app";
-        import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
+        import { getFirestore, enableIndexedDbPersistence, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy} from "firebase/firestore";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
         // --- CONFIGURAÇÃO FIREBASE ---
@@ -137,6 +137,13 @@
         const appInfo = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
         const db = getFirestore(appInfo);
         const auth = getAuth(appInfo);
+        enableIndexedDbPersistence(db).catch((err) => {
+        if (err.code === 'failed-precondition') {
+            console.warn('Persistência offline falhou: múltiplas abas abertas');
+        } else if (err.code === 'unimplemented') {
+            console.warn('Navegador não suporta persistência offline');
+        }
+        });
 
         // --- ESTADO DA APLICAÇÃO ---
         const INITIAL_STATE = {
