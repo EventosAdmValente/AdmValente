@@ -14,8 +14,20 @@
     };
 
     function exitApp() {
-    // Remove o app da pilha e sai do domínio
-    location.replace(document.referrer || '/');
+        const isPWA =
+            window.matchMedia('(display-mode: standalone)').matches ||
+            window.navigator.standalone === true;
+    
+        if (isPWA) {
+            // PWA instalado → fecha/minimiza como app nativo
+            try {
+                window.close();
+            } catch (e) {}
+            return;
+        }
+    
+        // Navegador → sai do app sem tela branca
+        location.replace(document.referrer || '/');
     }
 
     function createModal() {
