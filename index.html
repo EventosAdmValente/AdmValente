@@ -1029,80 +1029,53 @@
                 }
             });
         };
-        renderApp();
-    
-    // função para sair do app
-    
-   function ensureInitialHistory() {
-    // Garante que não vamos empurrar estados duplicados várias vezes
-    if (!window.__app_history_initialized) {
-        try {
-            history.pushState({ screen: 'home' }, '', '');
-            // Não usar replaceState aqui — manter simples
-        } catch(e) {}
-        window.__app_history_initialized = true;
-    }
-}
-
-function tryExitApp() {
-    // 1) Tenta sair pelo histórico — calcula um salto grande para garantir saída
-    try {
-        const steps = -Math.max(3, window.history.length || 3);
-        history.go(steps);
-    } catch (e) {}
-
-    // 2) Se após 300ms ainda estamos aqui, tenta window.close() (funciona em alguns PWAs/WebViews)
-    setTimeout(() => {
-        try {
-            window.open('', '_self'); // prepara self-close
-            window.close();
-        } catch (e) {}
-    }, 300);
-
-    // 3) Se ainda não saiu (fallback), navega para uma página neutra (about:blank) para simular saída
-    setTimeout(() => {
-        try {
-            location.href = 'about:blank';
-        } catch (e) {
-            // último recurso: redirecionar para google — visível mas força sair do contexto do app
-            location.href = 'https://www.google.com/';
-        }
-    }, 700);
-}
-
-function showExitDialog() {
-    ensureInitialHistory();
-
-    const dialog = document.getElementById("exitDialog");
-    if (!dialog) {
-        // Se por algum motivo o modal não existir, faz fallback direto
-        tryExitApp();
-        return;
-    }
-
-    dialog.style.display = "flex";
-
-    // Cancelar
-    document.getElementById("exitCancel").onclick = () => {
-        dialog.style.display = "none";
-        // Recoloca um estado para manter trap
-        try { history.pushState({ screen: 'home' }, "", ""); } catch(e){}
-    };
-
-    // Confirmar = sair
-    document.getElementById("exitConfirm").onclick = () => {
-        dialog.style.display = "none";
-        // Executa várias estratégias de saída
-        tryExitApp();
-    };
-}
-    
-    
+        renderApp();    
     </script>
+    
+    // código para saída do app
+<script>
+                   // Controle da tela atual
+            let telaAtual = "home"; // nome da sua tela inicial
+            
+            // Sempre que mudar de tela, chame esta função
+            function mudarTela(novaTela) {
+              telaAtual = novaTela;
+            
+              // Quando sair da home, cria histórico
+              if (novaTela !== "home") {
+                history.pushState({ tela: novaTela }, "", "");
+              }
+            }
+            
+            // Cria um estado inicial para impedir saída imediata
+            history.pushState({ tela: "home" }, "", "");
+            
+            // Intercepta o botão voltar
+            window.addEventListener("popstate", function () {
+            
+              // Se estiver na tela inicial
+              if (telaAtual === "home") {
+                const sair = confirm("Tem certeza que deseja sair do aplicativo?");
+            
+                if (sair) {
+                  // Remove o bloqueio e sai do app
+                  window.removeEventListener("popstate", arguments.callee);
+                  history.back();
+                } else {
+                  // Recria o bloqueio
+                  history.pushState({ tela: "home" }, "", "");
+                }
+            
+              } else {
+                // Se estiver em outra tela, volta para a home
+                mudarTela("home");
+              }
+            }); 
+</script>
 
     
 
-    // Código de saída do App
+    // Código que cria o pop-up de saída do App
     
    <div id="exitDialog" style="
     position: fixed;
