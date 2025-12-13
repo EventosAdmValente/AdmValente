@@ -226,12 +226,13 @@
         window.state = state;
         window.renderIcons = () => { if(window.lucide) lucide.createIcons(); }
 
-        // --- SISTEMA DE NAVEGAÇÃO "ROOT MARKER" (CORREÇÃO BOTÃO VOLTAR) ---
-        // Inicializa o histórico com um estado "root" e empurra a "home" por cima.
-        // Ao voltar da home, cai em "root", acionando o modal de saída.
+        // --- SISTEMA DE NAVEGAÇÃO NATIVA ---
+        
+        // Garante que a primeira entrada no histórico tenha o estado 'home'
         window.addEventListener('load', () => {
-            history.replaceState({ screen: 'root' }, '', '');
-            history.pushState({ screen: 'home' }, '', '');
+            if (!history.state) {
+                history.replaceState({ screen: 'home' }, '', '');
+            }
             renderApp();
         });
 
@@ -241,6 +242,7 @@
                 renderApp();
                 return;
             }
+            // Adiciona nova entrada no histórico para a nova tela
             history.pushState({ screen: screen }, '', '');
             internalNavigateTo(screen);
         }
@@ -257,60 +259,25 @@
             renderApp();
         };
 
-        window.confirmExitApp = () => {
-            try { window.close(); } catch(e){} 
-            // Se window.close falhar (comum), history.back() a partir do root deve fechar o app/aba
-            try { history.back(); } catch(e){}
-        };
-        
-        window.cancelExitApp = () => {
-            closeModal();
-            // Restaura o estado home
-            history.pushState({ screen: 'home' }, '', '');
-        };
-
+        // Captura o evento de 'Voltar' do navegador/celular
         window.addEventListener('popstate', (event) => {
             const currentHistoryState = event.state;
 
-            // 1. Menu Aberto: Fecha e mantêm na tela atual
+            // Fecha o menu se estiver aberto, mas permite a navegação continuar
             if (state.isMenuOpen) {
                  state.isMenuOpen = false;
-                 history.pushState({ screen: state.currentScreen }, '', ''); 
-                 renderApp();
-                 return;
             }
 
-            // 2. Modal de Saída já aberto: Fecha (comportamento de cancelar)
-            if (document.getElementById('exit-modal-content')) {
-                closeModal();
-                history.pushState({ screen: 'home' }, '', '');
-                return;
-            }
-
-            // 3. Lógica Root Marker
-            if (currentHistoryState && currentHistoryState.screen === 'root') {
-                // Chegou na raiz (veio da Home), mostra modal de saída
-                const html = `
-                    <div id="exit-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in">
-                        <div class="text-center mb-6 pt-2">
-                            <p class="text-slate-700 font-bold text-lg">Deseja sair da Agenda?</p>
-                        </div>
-                        <div class="flex gap-3">
-                            <button onclick="cancelExitApp()" class="flex-1 py-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">Cancelar</button>
-                            <button onclick="confirmExitApp()" class="flex-1 py-3 rounded-lg bg-navy text-white hover:bg-navy-dark font-bold shadow-lg shadow-blue-900/20">OK</button>
-                        </div>
-                    </div>
-                `;
-                window.showModal(html);
-            } else if (currentHistoryState && currentHistoryState.screen) {
-                // Navegação normal
+            // Se houver um estado definido no histórico, navega para ele
+            if (currentHistoryState && currentHistoryState.screen) {
                 internalNavigateTo(currentHistoryState.screen);
             } else {
-                // Estado perdido, restaura home
-                history.replaceState({ screen: 'root' }, '', '');
-                history.pushState({ screen: 'home' }, '', '');
+                // Se não houver estado (ex: chegou no inicio do histórico da aba), vai para home
                 internalNavigateTo('home');
             }
+            // Se o usuário estiver na Home e clicar em voltar novamente, 
+            // o navegador executará o comportamento padrão (sair do app/fechar aba)
+            // pois não haverá mais entradas no histórico manipulado por nós.
         });
 
         // --- RENDERIZAÇÃO PRINCIPAL ---
