@@ -164,6 +164,7 @@
             
             isMenuOpen: false,
             editingEventId: null,
+            isExiting: false, // Flag de controle de saída
             
             searchTerm: '',
             filterStartDate: '',
@@ -186,7 +187,7 @@
             set(target, property, value) {
                 target[property] = value;
                 // Renderização seletiva para performance em inputs de texto
-                if (!['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm'].includes(property)) {
+                if (!['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm', 'isExiting'].includes(property)) {
                     renderApp(); 
                 } else {
                     if (property === 'searchTerm') renderHome(); 
@@ -430,6 +431,9 @@
 
         // Listener do Botão Voltar (History API)
         window.addEventListener('popstate', (event) => {
+            // Se a flag de saída estiver ativa, não faz nada e deixa o navegador voltar (sair do app)
+            if (state.isExiting) return;
+
             // Se o menu estiver aberto, fecha e mantém estado visualmente
             if (state.isMenuOpen) {
                  state.isMenuOpen = false;
@@ -455,7 +459,7 @@
                             </div>
                             <div class="flex gap-3">
                                 <button onclick="closeModal()" class="flex-1 py-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">Cancelar</button>
-                                <button onclick="try{window.close()}catch(e){}" class="flex-1 py-3 rounded-lg bg-navy text-white hover:bg-navy-dark font-bold shadow-lg shadow-blue-900/20">OK</button>
+                                <button onclick="state.isExiting = true; history.go(-2); try{window.close()}catch(e){}" class="flex-1 py-3 rounded-lg bg-navy text-white hover:bg-navy-dark font-bold shadow-lg shadow-blue-900/20">OK</button>
                             </div>
                         </div>
                     `;
