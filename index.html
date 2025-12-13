@@ -74,14 +74,13 @@
     "firebase/app": "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js",
     "firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js",
     "firebase/auth": "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js",
+    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
     "firebase/": "https://esm.sh/firebase@^12.6.0/"
   }
 }
 </script>
-    <script src="back-handler.js"></script>
 </head>
 <body class="h-screen w-full flex flex-col">
 
@@ -349,6 +348,7 @@
         // Assim, quando o usuário voltar de 'home', ele cai em 'root' e disparamos o modal.
         window.addEventListener('load', () => {
             history.replaceState({ screen: 'root' }, '', '');
+            history.pushState({ screen: 'home' }, '', '');
             renderApp();
         });
 
@@ -421,8 +421,12 @@
         }
 
         // --- FUNÇÃO GLOBAL DE SAÍDA ---
-       window.confirmExitApp = () => {
+        window.confirmExitApp = () => {
+            // Tenta fechar a janela (funciona em PWA/Popups)
             try { window.close(); } catch(e){}
+            
+            // A ação crítica: voltar mais uma vez no histórico.
+            // Como estamos no estado 'root', voltar daqui sai da página/app.
             try { history.back(); } catch(e){}
         };
         
@@ -433,23 +437,53 @@
         };
 
         // --- GERENCIAMENTO DE VOLTAR / POPSTATE ---
-       window.addEventListener('popstate', (event) => {
+        window.addEventListener('popstate', (event) => {
+            const currentHistoryState = event.state;
 
-            // Fecha menu se estiver aberto
+            // Se o menu estiver aberto, apenas fecha o menu e empurra o estado de volta para não sair
             if (state.isMenuOpen) {
-                state.isMenuOpen = false;
-                renderApp();
+                 state.isMenuOpen = false;
+                 history.pushState({ screen: state.currentScreen }, '', ''); 
+                 renderApp();
+                 return;
+            }
+
+            // Se um modal de saída já estiver aberto e o usuário clicar voltar novamente, consideramos como Cancelar
+            const exitModal = document.getElementById('exit-modal-content');
+            if (exitModal) {
+                closeModal();
+                history.pushState({ screen: 'home' }, '', '');
                 return;
             }
-        
-            // Navegação normal pelo histórico
-            if (event.state && event.state.screen) {
-                internalNavigateTo(event.state.screen);
-                return;
+
+            // Lógica principal
+            if (currentHistoryState && currentHistoryState.screen === 'root') {
+                // Chegamos ao fundo do poço (Root Marker).
+                // O usuário estava em Home e clicou em Voltar.
+                // Mostramos o modal de saída.
+                const html = `
+                    <div id="exit-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in">
+                        <div class="text-center mb-6 pt-2">
+                            <p class="text-slate-700 font-bold text-lg">Deseja sair da Agenda?</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button onclick="cancelExitApp()" class="flex-1 py-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">Cancelar</button>
+                            <button id="btn-ok-exit" onclick="confirmExitApp()" class="flex-1 py-3 rounded-lg bg-navy text-white hover:bg-navy-dark font-bold shadow-lg shadow-blue-900/20">OK</button>
+                        </div>
+                    </div>
+                `;
+                window.showModal(html);
+                // Não renderizamos nada, mantemos a Home visível no fundo (que é o padrão pois o DOM não muda no popstate a menos que mandemos)
+            } else if (currentHistoryState && currentHistoryState.screen) {
+                // Navegação normal entre telas
+                internalNavigateTo(currentHistoryState.screen);
+            } else {
+                // Estado inválido ou reload, restaura para Home
+                history.replaceState({ screen: 'root' }, '', '');
+                history.pushState({ screen: 'home' }, '', '');
+                internalNavigateTo('home');
             }
-        
-            // Se não houver mais histórico, o sistema sai do app
-    });
+        });
 
         // --- HOME SCREEN ---
         function renderHome() {
@@ -626,7 +660,10 @@
                 </button>`;
             }
 
-            const title = state.pickerTarget ? 'Selecione a Data' : 'Agenda';
+            let title = 'Agenda';
+            if (state.pickerTarget === 'filterStartDate') title = 'Data de Início';
+            else if (state.pickerTarget === 'filterEndDate') title = 'Data do Final';
+            else if (state.pickerTarget) title = 'Selecione a Data';
 
             const html = `
                 <div id="calendar-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-4 flex flex-col max-h-[90vh]">
