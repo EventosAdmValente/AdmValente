@@ -71,11 +71,13 @@
   }
 }
 </script>
-    <link rel="manifest" href="./manifest.json">
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
-    <meta name="theme-color" content="#003366">
+    <script>
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('Service Worker registrado'))
+        .catch(err => console.error('Erro no SW', err));
+        }
+    </script>
 </head>
 <body class="h-screen w-full flex flex-col bg-slate-100">
 
