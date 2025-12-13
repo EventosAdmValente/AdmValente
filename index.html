@@ -164,7 +164,6 @@
             
             isMenuOpen: false,
             editingEventId: null,
-            isExiting: false, // Flag de controle de saída
             
             searchTerm: '',
             filterStartDate: '',
@@ -187,7 +186,7 @@
             set(target, property, value) {
                 target[property] = value;
                 // Renderização seletiva para performance em inputs de texto
-                if (!['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm', 'isExiting'].includes(property)) {
+                if (!['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm'].includes(property)) {
                     renderApp(); 
                 } else {
                     if (property === 'searchTerm') renderHome(); 
@@ -343,8 +342,15 @@
 
         // --- NAVIGATION & HISTORY ---
         
-        // Empurra estado inicial para termos histórico
-        history.pushState({ screen: 'home' }, '', '');
+        // Estratégia de Navegação "Root Marker"
+        // 1. Substitui o estado inicial por 'root'
+        // 2. Empurra o estado 'home'
+        // Assim, quando o usuário voltar de 'home', ele cai em 'root' e disparamos o modal.
+        window.addEventListener('load', () => {
+            history.replaceState({ screen: 'root' }, '', '');
+            history.pushState({ screen: 'home' }, '', '');
+            renderApp();
+        });
 
         const renderNavMenu = () => {
             if (!state.isMenuOpen) return '';
@@ -416,36 +422,33 @@
 
         // --- FUNÇÃO GLOBAL DE SAÍDA ---
         window.confirmExitApp = () => {
-            const btn = document.getElementById('btn-ok-exit');
-            if(btn) btn.innerText = 'Saindo...';
-            
-            // Define flag para impedir loops futuros
-            state.isExiting = true;
-            
-            // Tenta métodos nativos de fechamento
+            // Tenta fechar a janela (funciona em PWA/Popups)
             try { window.close(); } catch(e){}
-            try { window.open('', '_self').close(); } catch(e){}
             
-            // FALLBACK INFALÍVEL: Redireciona para o Google
-            // Isso garante que o usuário saia do app se o window.close falhar (comum em mobile/chrome)
-            window.location.href = 'https://www.google.com';
+            // A ação crítica: voltar mais uma vez no histórico.
+            // Como estamos no estado 'root', voltar daqui sai da página/app.
+            try { history.back(); } catch(e){}
+        };
+        
+        window.cancelExitApp = () => {
+            closeModal();
+            // Restaura o estado 'home' para que o usuário continue no app
+            history.pushState({ screen: 'home' }, '', '');
         };
 
         // --- GERENCIAMENTO DE VOLTAR / POPSTATE ---
         window.addEventListener('popstate', (event) => {
-            // Se já estamos saindo, não faz nada
-            if (state.isExiting) return;
+            const currentHistoryState = event.state;
 
-            // Se o menu estiver aberto, apenas fecha o menu
+            // Se o menu estiver aberto, apenas fecha o menu e empurra o estado de volta para não sair
             if (state.isMenuOpen) {
                  state.isMenuOpen = false;
-                 // Como o back consumiu um histórico, repomos para manter consistência
                  history.pushState({ screen: state.currentScreen }, '', ''); 
                  renderApp();
                  return;
             }
 
-            // Se um modal de saída já estiver aberto e o usuário clicar voltar, fechamos o modal
+            // Se um modal de saída já estiver aberto e o usuário clicar voltar novamente, consideramos como Cancelar
             const exitModal = document.getElementById('exit-modal-content');
             if (exitModal) {
                 closeModal();
@@ -453,29 +456,32 @@
                 return;
             }
 
-            // Lógica principal de navegação
-            if (state.currentScreen !== 'home') {
-                // Se não está na home, permite voltar para a tela anterior (ou home se não houver state)
-                const dest = (event.state && event.state.screen) ? event.state.screen : 'home';
-                internalNavigateTo(dest);
-            } else {
-                // SE ESTÁ NA HOME e clicou voltar:
-                // 1. Repomos o estado para impedir que o navegador saia imediatamente
-                history.pushState({ screen: 'home' }, '', '');
-                
-                // 2. Mostramos o modal de confirmação
+            // Lógica principal
+            if (currentHistoryState && currentHistoryState.screen === 'root') {
+                // Chegamos ao fundo do poço (Root Marker).
+                // O usuário estava em Home e clicou em Voltar.
+                // Mostramos o modal de saída.
                 const html = `
                     <div id="exit-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in">
                         <div class="text-center mb-6 pt-2">
                             <p class="text-slate-700 font-bold text-lg">Deseja sair da Agenda?</p>
                         </div>
                         <div class="flex gap-3">
-                            <button onclick="closeModal()" class="flex-1 py-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">Cancelar</button>
+                            <button onclick="cancelExitApp()" class="flex-1 py-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">Cancelar</button>
                             <button id="btn-ok-exit" onclick="confirmExitApp()" class="flex-1 py-3 rounded-lg bg-navy text-white hover:bg-navy-dark font-bold shadow-lg shadow-blue-900/20">OK</button>
                         </div>
                     </div>
                 `;
                 window.showModal(html);
+                // Não renderizamos nada, mantemos a Home visível no fundo (que é o padrão pois o DOM não muda no popstate a menos que mandemos)
+            } else if (currentHistoryState && currentHistoryState.screen) {
+                // Navegação normal entre telas
+                internalNavigateTo(currentHistoryState.screen);
+            } else {
+                // Estado inválido ou reload, restaura para Home
+                history.replaceState({ screen: 'root' }, '', '');
+                history.pushState({ screen: 'home' }, '', '');
+                internalNavigateTo('home');
             }
         });
 
