@@ -228,7 +228,7 @@
 
         // --- SISTEMA DE NAVEGAÇÃO NATIVA ---
         
-        // Garante que a primeira entrada no histórico tenha o estado 'home'
+        // Inicializa o estado do histórico para suportar navegação
         window.addEventListener('load', () => {
             if (!history.state) {
                 history.replaceState({ screen: 'home' }, '', '');
@@ -263,7 +263,8 @@
         window.addEventListener('popstate', (event) => {
             const currentHistoryState = event.state;
 
-            // Fecha o menu se estiver aberto, mas permite a navegação continuar
+            // Se o menu estiver aberto, apenas o fechamos visualmente
+            // A navegação de URL já aconteceu, então sincronizamos a tela
             if (state.isMenuOpen) {
                  state.isMenuOpen = false;
             }
@@ -272,17 +273,14 @@
             if (currentHistoryState && currentHistoryState.screen) {
                 internalNavigateTo(currentHistoryState.screen);
             } else {
-                // Se não houver estado (ex: chegou no inicio do histórico da aba), vai para home
+                // Se não houver estado (início do histórico), assume Home
                 internalNavigateTo('home');
             }
-            // Se o usuário estiver na Home e clicar em voltar novamente, 
-            // o navegador executará o comportamento padrão (sair do app/fechar aba)
-            // pois não haverá mais entradas no histórico manipulado por nós.
         });
 
         // --- RENDERIZAÇÃO PRINCIPAL ---
         window.renderApp = () => {
-            // Se modal de calendário estiver aberto, pausa renderização global
+            // Se modal de calendário estiver aberto, pausa renderização global para não perdê-lo
             if (document.getElementById('calendar-modal-content')) return;
 
             switch (state.currentScreen) {
