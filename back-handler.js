@@ -69,9 +69,13 @@
             // Primeiro back na home → mostra aviso
             if (!warned) {
                 warned = true;
+            
+                // segura o back no Android
+                history.pushState({ screen: HOME }, '', '');
+            
                 showWarning();
-                return true; // intercepta
-            }
+                return true;
+                }
 
             // Segundo back → deixa o sistema sair
             return false;
