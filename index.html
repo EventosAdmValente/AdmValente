@@ -434,24 +434,26 @@
         };
 
         // --- GERENCIAMENTO DE VOLTAR / POPSTATE ---
-        window.addEventListener('popstate', (event) => {
+       window.addEventListener('popstate', (event) => {
 
-        // Fecha menu se estiver aberto
-        if (state.isMenuOpen) {
-            state.isMenuOpen = false;
-            history.pushState({ screen: state.currentScreen }, '', '');
-            renderApp();
-            return;
-        }
-    
-        // Deixa o histórico mandar
-        if (event.state && event.state.screen) {
-            internalNavigateTo(event.state.screen);
-            return;
-        }
-    
-        // Se não houver mais estado, o navegador sai do app
-});
+            // 1️⃣ Se menu estiver aberto, fecha
+            if (state.isMenuOpen) {
+                state.isMenuOpen = false;
+                renderApp();
+                return;
+            }
+        
+            // 2️⃣ 🔔 AQUI entra o BackHandler
+            const handled = BackHandler.onBack(state.currentScreen);
+            if (handled) return;
+        
+            // 3️⃣ Navegação normal
+            if (event.state && event.state.screen) {
+                internalNavigateTo(event.state.screen);
+            } else {
+                internalNavigateTo('home');
+            }
+    });
 
         // --- HOME SCREEN ---
         function renderHome() {
