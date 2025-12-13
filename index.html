@@ -81,13 +81,6 @@
   }
 }
 </script>
-    
-    <link rel="manifest" href="./manifest.json">
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
-    <meta name="theme-color" content="#003366">
-
 </head>
 <body class="h-screen w-full flex flex-col">
 
@@ -409,7 +402,6 @@
         }
 
         // Inicializar histórico
-        history.pushState({ screen: 'home' }, '', '');
         history.replaceState({ screen: 'home' }, '', '');
 
         // Função interna de navegação (sem manipular histórico)
@@ -437,27 +429,37 @@
 
         // Listener do Botão Voltar (History API)
         window.addEventListener('popstate', (event) => {
-            // Se o menu estiver aberto, fecha e mantém estado
+            // Se o menu estiver aberto, fecha e mantém estado visualmente
             if (state.isMenuOpen) {
                  state.isMenuOpen = false;
-                 // Empurra de volta pq o 'voltar' removeu, mas só queríamos fechar o menu
+                 // Empurra de volta pq o 'voltar' consumiu o estado, mas só queríamos fechar o menu
                  history.pushState({ screen: state.currentScreen }, '', ''); 
                  renderApp();
                  return;
             }
 
-            // Se existe estado no evento (navegação interna)
+            // Se existe estado no evento (navegação interna) e não é a home
             if (event.state && event.state.screen) {
                 internalNavigateTo(event.state.screen);
             } else {
-                // Se estamos na Home e o usuário tenta sair
-                    if (state.currentScreen === 'home') {
-                    showExitDialog();
-                    return;
-                }
-                    else {
+                // Estamos tentando voltar além da Home (ou o state é null/home)
+                if (state.currentScreen === 'home') {
+                    // Prende o usuário empurrando o estado novamente para não sair da página
+                    history.pushState({ screen: 'home' }, '', '');
+                    
+                    const html = `
+                        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in">
+                            <p class="text-slate-600 text-center mb-6 font-medium text-lg pt-2">Deseja sair do app?</p>
+                            <div class="flex gap-3">
+                                <button onclick="closeModal()" class="flex-1 py-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold shadow-sm">Cancelar</button>
+                                <button onclick="window.close()" class="flex-1 py-3 rounded-lg bg-navy text-white hover:bg-navy-dark font-bold shadow-md shadow-blue-900/20">OK</button>
+                            </div>
+                        </div>
+                    `;
+                    window.showModal(html);
+                } else {
+                    // Fallback: Se por algum motivo o state for null mas não estamos na home, vai pra home
                     internalNavigateTo('home');
-                    history.replaceState({ screen: 'home' }, '', '');
                 }
             }
         });
@@ -1029,92 +1031,15 @@
                 }
             });
         };
-        renderApp();    
+
+        // --- PREVENT APP EXIT ---
+        window.addEventListener('beforeunload', (e) => {
+            e.preventDefault();
+            e.returnValue = 'Tem certeza que deseja sair?';
+            return 'Tem certeza que deseja sair?';
+        });
+
+        renderApp();
     </script>
-    
-    
-<script>
-              // código para saída do app         
-            // Controle da tela atual
-            let telaAtual = "home"; // nome da sua tela inicial
-            
-            // Sempre que mudar de tela, chame esta função
-            function mudarTela(novaTela) {
-              telaAtual = novaTela;
-            
-              // Quando sair da home, cria histórico
-              if (novaTela !== "home") {
-                history.pushState({ tela: novaTela }, "", "");
-              }
-            }
-            
-            // Cria um estado inicial para impedir saída imediata
-            history.pushState({ tela: "home" }, "", "");
-            
-            // Intercepta o botão voltar
-            window.addEventListener("popstate", function () {
-            
-              // Se estiver na tela inicial
-              if (telaAtual === "home") {
-                const sair = confirm("Tem certeza que deseja sair do aplicativo?");
-            
-                if (sair) {
-                  // Remove o bloqueio e sai do app
-                  window.removeEventListener("popstate", arguments.callee);
-                  history.back();
-                } else {
-                  // Recria o bloqueio
-                  history.pushState({ tela: "home" }, "", "");
-                }
-            
-              } else {
-                // Se estiver em outra tela, volta para a home
-                mudarTela("home");
-              }
-            }); 
-</script>
-
-    
-
-    
-    
-   <div id="exitDialog" style="
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 99999;
-">
-    <div style="
-        background: white;
-        padding: 20px;
-        border-radius: 12px;
-        width: 80%;
-        max-width: 300px;
-        text-align: center;
-        font-size: 18px;
-    ">
-        <p style="margin-bottom: 20px;">Deseja realmente sair da Agenda?</p>
-
-        <button id="exitCancel" style="
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            background: #bdbdbd;
-            margin-right: 10px;
-        ">Cancelar</button>
-
-        <button id="exitConfirm" style="
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            background: #e53935;
-            color: white;
-        ">Sair</button>
-    </div>
-</div>
-
 </body>
 </html>
