@@ -14,16 +14,8 @@
     };
 
     function exitApp() {
-        // 1) Tenta fechar a aba (funciona em PWA / WebView)
-        try {
-            window.open('', '_self');
-            window.close();
-        } catch (e) {}
-    
-        // 2) Fallback: volta no histórico para sair do site
-        try {
-            history.back();
-        } catch (e) {}
+    // Remove o app da pilha e sai do domínio
+    location.replace(document.referrer || '/');
     }
 
     function createModal() {
