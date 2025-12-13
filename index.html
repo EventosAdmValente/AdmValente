@@ -435,52 +435,27 @@
 
         // --- GERENCIAMENTO DE VOLTAR / POPSTATE ---
         window.addEventListener('popstate', (event) => {
-            const currentHistoryState = event.state;
 
-            // Se o menu estiver aberto, apenas fecha o menu e empurra o estado de volta para não sair
-            if (state.isMenuOpen) {
-                 state.isMenuOpen = false;
-                 history.pushState({ screen: state.currentScreen }, '', ''); 
-                 renderApp();
-                 return;
-            }
+    // Se o menu estiver aberto, fecha ele
+    if (state.isMenuOpen) {
+        state.isMenuOpen = false;
+        history.pushState({ screen: state.currentScreen }, '', '');
+        renderApp();
+        return;
+    }
 
-            // Se um modal de saída já estiver aberto e o usuário clicar voltar novamente, consideramos como Cancelar
-            const exitModal = document.getElementById('exit-modal-content');
-            if (exitModal) {
-                closeModal();
-                history.pushState({ screen: 'home' }, '', '');
-                return;
-            }
+    // 🔹 Back handler (verifica se é a tela home)
+    const handled = BackHandler.onBack(state.currentScreen);
+    if (handled) return; // Se BackHandler tratou o evento, não faz mais nada
 
-            // Lógica principal
-            if (currentHistoryState && currentHistoryState.screen === 'root') {
-                // Chegamos ao fundo do poço (Root Marker).
-                // O usuário estava em Home e clicou em Voltar.
-                // Mostramos o modal de saída.
-                const html = `
-                    <div id="exit-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in">
-                        <div class="text-center mb-6 pt-2">
-                            <p class="text-slate-700 font-bold text-lg">Deseja sair da Agenda?</p>
-                        </div>
-                        <div class="flex gap-3">
-                            <button onclick="cancelExitApp()" class="flex-1 py-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">Cancelar</button>
-                            <button id="btn-ok-exit" onclick="confirmExitApp()" class="flex-1 py-3 rounded-lg bg-navy text-white hover:bg-navy-dark font-bold shadow-lg shadow-blue-900/20">OK</button>
-                        </div>
-                    </div>
-                `;
-                window.showModal(html);
-                // Não renderizamos nada, mantemos a Home visível no fundo (que é o padrão pois o DOM não muda no popstate a menos que mandemos)
-            } else if (currentHistoryState && currentHistoryState.screen) {
-                // Navegação normal entre telas
-                internalNavigateTo(currentHistoryState.screen);
-            } else {
-                // Estado inválido ou reload, restaura para Home
-                history.replaceState({ screen: 'root' }, '', '');
-                history.pushState({ screen: 'home' }, '', '');
-                internalNavigateTo('home');
-            }
-        });
+    // 🔹 Navegação normal (se não for a tela home)
+    if (event.state && event.state.screen) {
+        internalNavigateTo(event.state.screen);
+    } else {
+        internalNavigateTo('home');
+        history.replaceState({ screen: 'home' }, '', '');
+    }
+});
 
         // --- HOME SCREEN ---
         function renderHome() {
