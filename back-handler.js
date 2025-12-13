@@ -7,6 +7,7 @@
 (function () {
 
     let modalOpen = false;
+    let exitArmed = false;
 
     const config = {
         homeScreen: 'home',
@@ -14,17 +15,10 @@
     };
 
     function exitApp() {
-        const isPWA =
-            window.matchMedia('(display-mode: standalone)').matches ||
-            window.navigator.standalone === true;
-    
-        if (isPWA) {
-            // PWA instalado → fecha/minimiza como app nativo
-            try {
-                window.close();
-            } catch (e) {}
-            return;
-        }
+    // No Android Web/PWA não é permitido fechar o app.
+    // Armamos a saída para o próximo botão voltar.
+    exitArmed = true;
+    }
     
         // Navegador → sai do app sem tela branca
         location.replace(document.referrer || '/');
@@ -91,6 +85,8 @@
 
         // OK → sai imediatamente
         document.getElementById('bh-ok').onclick = () => {
+            modal.style.display = 'none';
+            modalOpen = false;
             exitApp();
         };
     }
@@ -108,13 +104,19 @@
     window.BackHandler = {
 
         onBack(currentScreen) {
-            if (currentScreen === config.homeScreen) {
-                openModal();
-                return true; // evento tratado
-            }
 
-            return false; // deixa o app tratar
+    // Se a saída estiver armada, deixa o navegador sair
+    if (exitArmed) {
+        return false;
         }
+
+    if (currentScreen === config.homeScreen) {
+        openModal();
+        return true;
+        }
+
+    return false;
+    }    
     };
 
 })();
