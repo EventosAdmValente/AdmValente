@@ -1,6 +1,7 @@
-const CACHE_NAME = 'adm-valente-v2';
+const CACHE_NAME = 'adm-valente-v3';
 
 // Arquivos vitais para o app funcionar offline
+// NOTA: Usamos versões fixas e caminhos completos para evitar redirects que falham no cache offline.
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -9,9 +10,9 @@ const ASSETS_TO_CACHE = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
-  // Bibliotecas Externas
+  // Bibliotecas Externas (Versões Fixas)
   'https://cdn.tailwindcss.com',
-  'https://unpkg.com/lucide@latest',
+  'https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap',
   // Scripts do Firebase (versões específicas usadas no importmap do index.html)
   'https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js',
@@ -26,8 +27,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting(); // Força o SW a ativar imediatamente
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // Tenta cachear tudo. Se algum arquivo (ex: um ícone) faltar no servidor,
-      // o cache falhará, mas o site ainda abre online.
+      // Tenta cachear tudo.
       return cache.addAll(ASSETS_TO_CACHE).catch(err => {
         console.error("Aviso: Falha ao cachear alguns arquivos (verifique se a pasta icons existe):", err);
       });
@@ -52,7 +52,6 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   // Ignora requisições que não sejam GET ou que sejam para o Firestore/Google APIs dinâmicas
-  // O Firestore lida com sua própria persistência de dados via IndexedDB
   if (event.request.method !== 'GET') return;
   if (event.request.url.includes('firestore.googleapis.com')) return;
   if (event.request.url.includes('googleapis.com/auth')) return;
@@ -63,7 +62,7 @@ self.addEventListener('fetch', (event) => {
       return cachedResponse || fetch(event.request).then((response) => {
         return response;
       }).catch(() => {
-        // Se estiver offline e não tiver no cache, não faz nada (ou poderia retornar uma página de fallback)
+        // Se estiver offline e não tiver no cache, não faz nada
       });
     })
   );
