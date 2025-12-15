@@ -7,7 +7,7 @@
     <meta name="description" content="Gerenciador de Agenda Administrativa">
     <meta name="theme-color" content="#003366">
     
-    <!-- Link para o Manifesto Externo -->
+    <!-- Link para o Manifesto Externo (Não alterado) -->
     <link rel="manifest" href="./manifest.json">
     
     <!-- Ícone para iOS (Fallback) -->
@@ -55,10 +55,12 @@
         .fade-in { animation-name: fadeIn; }
         .zoom-in { animation-name: zoomIn; }
         .slide-in { animation: slideIn 0.3s ease-out; }
+        .slide-in-from-top-2 { animation: slideInTop 0.2s ease-out; }
         
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+        @keyframes slideInTop { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
         /* Input Styles */
         input:focus, select:focus, textarea:focus { outline: none; }
@@ -93,10 +95,10 @@
     "firebase/app": "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js",
     "firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js",
     "firebase/auth": "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js",
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "firebase/": "https://esm.sh/firebase@^12.6.0/",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "firebase/": "https://esm.sh/firebase@^12.6.0/"
   }
 }
 </script>
