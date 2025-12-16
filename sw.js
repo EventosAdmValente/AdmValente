@@ -1,4 +1,4 @@
-const CACHE_NAME = 'adm-valente-v55';
+const CACHE_NAME = 'adm-valente-v58';
 
 // Arquivos vitais para o app funcionar offline
 // NOTA: As URLs aqui DEVEM ser idênticas às usadas no index.html e Import Map
@@ -18,10 +18,10 @@ const ASSETS_TO_CACHE = [
   // Bibliotecas PDF
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
-  // Firebase Modular SDK v9.23.0
-  'https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js',
-  'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js',
-  'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js'
+  // Firebase SDK (Compat v9.23.0 for Namespaced API support)
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js'
 ];
 
 self.addEventListener('install', (event) => {
