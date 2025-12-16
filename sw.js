@@ -1,4 +1,4 @@
-const CACHE_NAME = 'adm-valente-v54';
+const CACHE_NAME = 'adm-valente-v55';
 
 // Arquivos vitais para o app funcionar offline
 // NOTA: As URLs aqui DEVEM ser idênticas às usadas no index.html e Import Map
