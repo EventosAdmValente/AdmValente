@@ -416,7 +416,7 @@
                         </div>
                         <div class="pt-4 flex flex-col gap-3 border-t mt-2">
                             ${window.state.isAdmin ? `<button type="button" onclick="window.saveEvent()" class="w-full py-3 bg-navy text-white rounded-lg font-bold shadow-lg shadow-blue-900/20 hover:bg-navy-dark flex items-center justify-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Salvar Evento</button>` : ''}
-                            ${isEditing && window.state.isAdmin ? `<button type="button" onclick="window.deleteEvent()" class="w-full py-3 border border-red-200 text-red-600 bg-red-50 rounded-lg font-bold hover:bg-red-100 flex items-center justify-center gap-2"><i data-lucide="trash-2" class="w-4 h-4"></i> Excluir Evento</button>` : ''}
+                            ${isEditing && window.state.isAdmin ? `<button type="button" onclick="window.requestDeleteEvent()" class="w-full py-3 border border-red-200 text-red-600 bg-red-50 rounded-lg font-bold hover:bg-red-100 flex items-center justify-center gap-2"><i data-lucide="trash-2" class="w-4 h-4"></i> Excluir Evento</button>` : ''}
                         </div>
                     </div>
                 </div>
@@ -463,13 +463,30 @@
             }
         };
 
-        window.deleteEvent = async () => {
+        window.requestDeleteEvent = () => {
             const id = window.state.editingEventId;
-            if (!id || !confirm("Tem certeza que deseja excluir?")) return;
+            if(!id) return;
+            window.showModal(`
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center animate-in fade-in zoom-in">
+                    <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-navy mb-2">Excluir Evento?</h3>
+                    <p class="text-slate-600 mb-6 text-sm">Tem certeza que deseja excluir? Esta ação não pode ser desfeita.</p>
+                    <div class="flex gap-3">
+                        <button onclick="closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Cancelar</button>
+                        <button onclick="confirmDeleteEvent('${id}')" class="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold shadow-lg hover:bg-red-700">Excluir</button>
+                    </div>
+                </div>
+            `);
+        };
+
+        window.confirmDeleteEvent = async (id) => {
             try {
                 await deleteDoc(doc(db, "agenda", id));
                 window.state.editingEventId = null;
                 window.resetAllFilters();
+                window.closeModal();
                 window.navigateTo("home");
             } catch (e) {
                 alert("Erro ao excluir: " + e.message);
@@ -518,10 +535,26 @@
         }
 
         window.requestDeleteRow = async (id, coll, name) => {
-            if (confirm(`Deseja realmente excluir ${name}?`)) {
-                try { await deleteDoc(doc(db, coll, id)); } 
-                catch (e) { alert("Erro ao excluir: " + e.message); }
-            }
+            window.showModal(`
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center animate-in fade-in zoom-in">
+                    <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-navy mb-2">Excluir ${name}?</h3>
+                    <p class="text-slate-600 mb-6 text-sm">Tem certeza? Esta ação não pode ser desfeita.</p>
+                    <div class="flex gap-3">
+                        <button onclick="closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Cancelar</button>
+                        <button onclick="confirmDeleteRow('${id}', '${coll}')" class="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold shadow-lg hover:bg-red-700">Excluir</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        window.confirmDeleteRow = async (id, coll) => {
+            try { 
+                await deleteDoc(doc(db, coll, id)); 
+                window.closeModal();
+            } catch (e) { alert("Erro ao excluir: " + e.message); }
         }
         
         window.getCollectionKeyByScreen = (s) => {
@@ -544,9 +577,10 @@
 
         // --- FILTROS E HELPERS ---
         function getFilteredEvents() {
+            let result = [];
             if (state.advancedFilter.active) {
                 const af = state.advancedFilter;
-                return state.events.filter((e) => {
+                result = state.events.filter((e) => {
                     if (af.useStatus) {
                         const isPast = isEventPast(e.date, e.time);
                         if (af.statusVal === 'active' && isPast) return false;
@@ -565,17 +599,25 @@
                     }
                     return true;
                 });
+            } else {
+                const lowerTerm = state.searchTerm.toLowerCase();
+                result = state.events.filter((e) => {
+                    const type = state.types.find(t => t.id === e.typeId); 
+                    const loc = state.locations.find(l => l.id === e.locationId); 
+                    const att = state.attendants.find(a => a.id === e.attendantId);
+                    const matchesSearch = !state.searchTerm || (type?.name.toLowerCase().includes(lowerTerm)) || (type?.sigla?.toLowerCase().includes(lowerTerm)) || (loc?.name.toLowerCase().includes(lowerTerm)) || (att?.name.toLowerCase().includes(lowerTerm));
+                    let matchesDate = true;
+                    if (state.selectedDate) matchesDate = e.date === state.selectedDate;
+                    else if (state.filterStartDate || state.filterEndDate) { const start = state.filterStartDate || '0000-00-00'; const end = state.filterEndDate || '9999-12-31'; matchesDate = e.date >= start && e.date <= end; }
+                    return matchesSearch && matchesDate;
+                });
             }
-            const lowerTerm = state.searchTerm.toLowerCase();
-            return state.events.filter((e) => {
-                const type = state.types.find(t => t.id === e.typeId); 
-                const loc = state.locations.find(l => l.id === e.locationId); 
-                const att = state.attendants.find(a => a.id === e.attendantId);
-                const matchesSearch = !state.searchTerm || (type?.name.toLowerCase().includes(lowerTerm)) || (type?.sigla?.toLowerCase().includes(lowerTerm)) || (loc?.name.toLowerCase().includes(lowerTerm)) || (att?.name.toLowerCase().includes(lowerTerm));
-                let matchesDate = true;
-                if (state.selectedDate) matchesDate = e.date === state.selectedDate;
-                else if (state.filterStartDate || state.filterEndDate) { const start = state.filterStartDate || '0000-00-00'; const end = state.filterEndDate || '9999-12-31'; matchesDate = e.date >= start && e.date <= end; }
-                return matchesSearch && matchesDate;
+
+            // Ordenação: Data (Crescente) e Hora (Crescente)
+            return result.sort((a, b) => {
+                const dateComp = a.date.localeCompare(b.date);
+                if (dateComp !== 0) return dateComp;
+                return a.time.localeCompare(b.time);
             });
         }
 
@@ -653,7 +695,7 @@
                 calendarHtml += `<button onclick="toggleDateSelection('${dateStr}')" class="aspect-square flex flex-col items-center justify-start pt-1.5 rounded-lg border ${isSelected ? 'bg-navy text-white shadow-md border-navy scale-105 z-10' : 'hover:bg-slate-200/60 border-transparent'} ${isToday && !isSelected ? 'bg-blue-50/50 font-bold border-blue-200' : ''}"><span class="text-xs sm:text-sm leading-none mb-1">${day}</span><div class="flex gap-0.5 justify-center flex-wrap px-0.5 w-full">${dotsHtml}</div></button>`;
             }
             let title = 'Agenda'; if (state.pickerTarget) title = 'Selecione a Data';
-            window.showModal(`<div id="calendar-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-4 flex flex-col max-h-[90vh]"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5"></i> ${title}</h3><button onclick="closeModal()" class="text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button></div><div><div class="flex justify-between items-center mb-4 gap-2 bg-slate-50 p-2 rounded-lg"><button onclick="changeMonth(-1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-left" class="w-5 h-5"></i></button><div class="flex gap-2 items-center flex-1 justify-center"><select onchange="changeViewDate()" id="monthSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${monthNames.map((m, i) => `<option value="${i}" ${i === state.viewDate.getMonth() ? 'selected' : ''}>${m}</option>`).join('')}</select><select onchange="changeViewDate()" id="yearSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${Array.from({length: 10}, (_, i) => new Date().getFullYear() - 5 + i).map(y => `<option value="${y}" ${y === state.viewDate.getFullYear() ? 'selected' : ''}>${y}</option>`).join('')}</select></div><button onclick="changeMonth(1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-right" class="w-5 h-5"></i></button></div><div class="grid grid-cols-7 gap-1 text-center text-xs font-black text-slate-400 mb-2"><div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div></div><div class="grid grid-cols-7 gap-1 sm:gap-2 mb-2">${calendarHtml}</div></div>${!state.pickerTarget && state.selectedDate ? `<div class="border-t pt-3 mt-2 flex-1 min-h-0 flex flex-col"><div class="text-xs font-bold text-slate-500 uppercase mb-2">Eventos: ${formatDate(state.selectedDate)}</div><div class="flex flex-col gap-1 overflow-y-auto max-h-[180px] pr-1">${state.events.filter(e => e.date === state.selectedDate).map(e => { const type = state.types.find(t => t.id === e.typeId); const sigla = type?.sigla ? ` <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 ml-1">${type.sigla}</span>` : ''; return `<div class="bg-slate-50 border border-slate-200 p-2 rounded flex items-center gap-2 text-xs"><span class="font-bold text-navy whitespace-nowrap">${e.time}</span><span class="truncate font-medium text-slate-700 flex-1 flex items-center">${type?.name || 'Evento'}${sigla}</span></div>`; }).join('') || '<div class="text-center text-slate-400 text-xs italic">Nada agendado.</div>'}</div></div>` : ''}${!state.pickerTarget ? `<div class="mt-4 pt-3 border-t"><button onclick="closeModal(); renderApp()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-navy-dark transition-colors"><i data-lucide="list" class="w-4 h-4"></i> Ver Lista</button></div>` : ''}</div>`);
+            window.showModal(`<div id="calendar-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-4 flex flex-col max-h-[90vh]"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5"></i> ${title}</h3><button onclick="closeModal()" class="text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button></div><div><div class="flex justify-between items-center mb-4 gap-2 bg-slate-50 p-2 rounded-lg"><button onclick="changeMonth(-1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-left" class="w-5 h-5"></i></button><div class="flex gap-2 items-center flex-1 justify-center"><select onchange="changeViewDate()" id="monthSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${monthNames.map((m, i) => `<option value="${i}" ${i === state.viewDate.getMonth() ? 'selected' : ''}>${m}</option>`).join('')}</select><select onchange="changeViewDate()" id="yearSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${Array.from({length: 10}, (_, i) => new Date().getFullYear() - 5 + i).map(y => `<option value="${y}" ${y === state.viewDate.getFullYear() ? 'selected' : ''}>${y}</option>`).join('')}</select></div><button onclick="changeMonth(1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-right" class="w-5 h-5"></i></button></div><div class="grid grid-cols-7 gap-1 text-center text-xs font-black text-slate-400 mb-2"><div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div></div><div class="grid grid-cols-7 gap-1 sm:gap-2 mb-2">${calendarHtml}</div></div>${!state.pickerTarget && state.selectedDate ? `<div class="border-t pt-3 mt-2 flex-1 min-h-0 flex flex-col"><div class="text-xs font-bold text-slate-500 uppercase mb-2">Eventos: ${formatDate(state.selectedDate)}</div><div class="flex flex-col gap-1 overflow-y-auto max-h-[180px] pr-1">${state.events.filter(e => e.date === state.selectedDate).sort((a,b) => a.time.localeCompare(b.time)).map(e => { const type = state.types.find(t => t.id === e.typeId); const sigla = type?.sigla ? ` <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-navy text-white ml-1">${type.sigla}</span>` : ''; return `<div class="bg-slate-50 border border-slate-200 p-2 rounded flex items-center gap-2 text-xs"><span class="font-bold text-navy whitespace-nowrap">${e.time}</span><span class="truncate font-medium text-slate-700 flex-1 flex items-center">${type?.name || 'Evento'}${sigla}</span></div>`; }).join('') || '<div class="text-center text-slate-400 text-xs italic">Nada agendado.</div>'}</div></div>` : ''}${!state.pickerTarget ? `<div class="mt-4 pt-3 border-t"><button onclick="closeModal(); renderApp()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-navy-dark transition-colors"><i data-lucide="list" class="w-4 h-4"></i> Ver Lista</button></div>` : ''}</div>`);
         };
 
         window.toggleDateSelection = (d) => { 
@@ -798,7 +840,8 @@
 
         window.openPDFPreview = () => {
             // Gera o PDF em memória para preview
-            const doc = new window.jspdf.jsPDF();
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
             doc.setFontSize(22); doc.setTextColor(0, 51, 102); doc.setFont("helvetica", "bold");
             doc.text("RELATÓRIO DE EVENTOS", pageWidth / 2, 20, { align: 'center' });
@@ -833,7 +876,7 @@
                         <button onclick="closeModal()" class="text-slate-400 hover:text-navy"><i data-lucide="x" class="w-6 h-6"></i></button>
                     </div>
                     <div class="flex-1 bg-slate-200 relative">
-                        <iframe src="${pdfUrl}" class="w-full h-full absolute inset-0 border-0"></iframe>
+                        <iframe src="${pdfUrl}" type="application/pdf" class="w-full h-full absolute inset-0 border-0"></iframe>
                     </div>
                     <div class="p-4 bg-white border-t border-slate-200 flex gap-3 justify-end">
                         <button onclick="closeModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Fechar</button>
@@ -844,7 +887,8 @@
         };
 
         window.confirmPDFDownload = () => {
-            const doc = new window.jspdf.jsPDF();
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
             // Título Profissional e Centralizado
             doc.setFontSize(22); doc.setTextColor(0, 51, 102); doc.setFont("helvetica", "bold");
