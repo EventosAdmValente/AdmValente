@@ -1,7 +1,7 @@
-const CACHE_NAME = 'adm-valente-v5';
+const CACHE_NAME = 'adm-valente-v51';
 
 // Arquivos vitais para o app funcionar offline
-// NOTA: As URLs aqui DEVEM ser idênticas às usadas no index.html
+// NOTA: As URLs aqui DEVEM ser idênticas às usadas no index.html e Import Map
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -13,15 +13,15 @@ const ASSETS_TO_CACHE = [
   // Bibliotecas CSS e Fontes
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap',
-  // Lucide Icons (Versão Fixa)
+  // Lucide Icons
   'https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js',
-  // Scripts do Firebase (Exatamente as versões do importmap)
-  'https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js',
-  'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js',
-  'https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js',
   // Bibliotecas PDF
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
+  // Firebase Modular SDK v9.23.0
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js',
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js',
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -51,22 +51,18 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Ignora requisições que não sejam GET
   if (event.request.method !== 'GET') return;
-  
-  // Ignora requisições para a API do Firestore (deixe o SDK lidar com isso via IndexedDB)
+  // Permitir firestore googleapis passarem direto
   if (event.request.url.includes('firestore.googleapis.com')) return;
   if (event.request.url.includes('googleapis.com/auth')) return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // Prioridade: Cache -> Rede
       if (cachedResponse) {
         return cachedResponse;
       }
       return fetch(event.request).catch(() => {
-        // Se falhar na rede e não tiver cache, não retorna nada (ou página de erro customizada)
-        // Isso evita erros vermelhos no console em modo avião para assets não essenciais
+        // Fallback silencioso se offline
       });
     })
   );
