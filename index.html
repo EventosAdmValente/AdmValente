@@ -189,6 +189,10 @@
         function formatDate(dateStr) { if (!dateStr) return ''; const parts = dateStr.split('-'); if (parts.length !== 3) return dateStr; return `${parts[2]}/${parts[1]}/${parts[0].slice(2)}`; }
         function formatDateFull(dateStr) { if (!dateStr) return ''; const parts = dateStr.split('-'); if (parts.length !== 3) return dateStr; return `${parts[2]}/${parts[1]}/${parts[0]}`; }
         function isEventPast(date, time) { return new Date(`${date}T${time}`) < new Date(); }
+        // Helper para ordenar listas alfabeticamente
+        function sortByName(list) {
+            return [...list].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+        }
 
         // --- RENDERIZADORES PRINCIPAIS ---
         function renderApp() {
@@ -248,7 +252,7 @@
                                 
                                 <div class="flex gap-2 items-center">
                                     <div class="relative flex-1">
-                                        <input id="homeSearch" type="text" placeholder="Pesquisar..." class="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-navy/20 shadow-sm">
+                                        <input id="homeSearch" type="text" placeholder="Pesquisar por eventos, sigla, localidade ou atendente" class="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-navy/20 shadow-sm text-ellipsis">
                                         <i data-lucide="search" class="absolute left-3 top-2.5 text-slate-400 w-4 h-4"></i>
                                     </div>
                                     <button onclick="openAdvancedFilterModal()" class="p-2 bg-white border border-slate-300 rounded-lg shadow-sm text-navy hover:bg-slate-50">
@@ -320,7 +324,7 @@
                                                 <div class="flex-1 min-w-0">
                                                     <div class="flex justify-between mb-0.5">
                                                         <h3 class="font-bold text-navy truncate pr-2">${type?.name||'Evento'}</h3>
-                                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0 h-5 flex items-center ${isPast ? 'bg-slate-300 text-slate-600' : 'bg-slate-500 text-white'}">
+                                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0 h-5 flex items-center ${isPast ? 'bg-slate-300 text-slate-600' : 'bg-navy text-white'}">
                                                             ${type?.sigla||'SIG'}
                                                         </span>
                                                     </div>
@@ -360,6 +364,11 @@
             const dateDisplay = dateVal ? formatDateFull(dateVal) : 'dd/mm/aa';
             const timeDisplay = timeVal || '00:00';
 
+            // Ordenando listas para os selects
+            const sortedLocs = sortByName(window.state.locations);
+            const sortedTypes = sortByName(window.state.types);
+            const sortedAtts = sortByName(window.state.attendants);
+
             const div = document.createElement('div'); 
             div.className = "flex flex-col h-screen bg-slate-100"; 
             div.id = "event-form-container";
@@ -388,21 +397,21 @@
                             <label class="block text-sm font-bold text-slate-700 mb-1">Local <span class="text-red-500">*</span></label>
                             <select id="evtLoc" class="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-navy/20 transition-all" onchange="this.classList.remove('input-error')">
                                 <option value="">Selecione...</option>
-                                ${window.state.locations.map(l => `<option value="${l.id}" ${l.id === locVal ? 'selected' : ''}>${l.name}</option>`).join('')}
+                                ${sortedLocs.map(l => `<option value="${l.id}" ${l.id === locVal ? 'selected' : ''}>${l.name}</option>`).join('')}
                             </select>
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-slate-700 mb-1">Tipo de Evento <span class="text-red-500">*</span></label>
                             <select id="evtType" class="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-navy/20 transition-all" onchange="this.classList.remove('input-error')">
                                 <option value="">Selecione...</option>
-                                ${window.state.types.map(t => `<option value="${t.id}" ${t.id === typeVal ? 'selected' : ''}>${t.name}</option>`).join('')}
+                                ${sortedTypes.map(t => `<option value="${t.id}" ${t.id === typeVal ? 'selected' : ''}>${t.name}</option>`).join('')}
                             </select>
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-slate-700 mb-1">Atendente <span class="text-xs font-normal text-slate-400">(Opcional)</span></label>
                             <select id="evtAtt" class="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-navy/20">
                                 <option value="">Selecione...</option>
-                                ${window.state.attendants.map(a => `<option value="${a.id}" ${a.id === attVal ? 'selected' : ''}>${a.name}</option>`).join('')}
+                                ${sortedAtts.map(a => `<option value="${a.id}" ${a.id === attVal ? 'selected' : ''}>${a.name}</option>`).join('')}
                             </select>
                         </div>
                         <div class="pt-4 flex flex-col gap-3 border-t mt-2">
@@ -471,8 +480,10 @@
         function renderGenericManager(title, collectionKey, nameLabel, hasSigla) { 
             const appElement = document.getElementById('app'); 
             if(appElement) {
-                const colList = state[collectionKey] || [];
-                appElement.innerHTML = `<div class="flex flex-col h-screen bg-slate-100"><div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10"><button onclick="navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button><h1 class="font-bold uppercase tracking-wide">${title}</h1></div><div class="p-4 flex-1 overflow-y-auto max-w-xl mx-auto w-full"><div class="bg-white p-5 rounded-xl shadow-md border border-slate-200 flex flex-col gap-2"><div class="relative mb-4"><input id="managerSearch" type="text" placeholder="Buscar..." class="w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-navy/20" value="${state.managerSearchTerm}" oninput="state.managerSearchTerm = this.value"><i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i></div>${state.isCreatingRow ? renderInlineRow(null, nameLabel, hasSigla, true) : ''}<ul class="flex flex-col gap-2">${colList.filter(i=>i.name.toLowerCase().includes(state.managerSearchTerm.toLowerCase())).map(i => state.editingRowId === i.id ? renderInlineRow(i, nameLabel, hasSigla, false) : `<li class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center"><div><div class="font-bold text-slate-800">${i.name}</div>${hasSigla && i.sigla ? `<div class="text-xs font-bold bg-slate-100 text-slate-50 px-2 py-0.5 rounded inline-block mt-1">${i.sigla}</div>` : ''}</div>${state.isAdmin ? `<div class="flex gap-2"><button onclick="startEditRow('${i.id}')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button><button onclick="requestDeleteRow('${i.id}', '${collectionKey}', '${nameLabel}')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>` : ''}</li>`).join('')}</ul></div></div>${state.isAdmin ? `<div class="fixed bottom-6 right-6"><button onclick="startCreateRow()" class="w-14 h-14 bg-orange-custom text-white rounded-full shadow-xl shadow-orange-500/30 flex items-center justify-center hover:bg-orange-dark active:scale-90 transition-all border border-white/20"><i data-lucide="plus" class="w-7 h-7"></i></button></div>` : ''}</div>`;
+                // Ordenar alfabeticamente
+                const colList = sortByName(state[collectionKey] || []);
+                
+                appElement.innerHTML = `<div class="flex flex-col h-screen bg-slate-100"><div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10"><button onclick="navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button><h1 class="font-bold uppercase tracking-wide">${title}</h1></div><div class="p-4 flex-1 overflow-y-auto max-w-xl mx-auto w-full"><div class="bg-white p-5 rounded-xl shadow-md border border-slate-200 flex flex-col gap-2"><div class="relative mb-4"><input id="managerSearch" type="text" placeholder="Buscar..." class="w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-navy/20" value="${state.managerSearchTerm}" oninput="state.managerSearchTerm = this.value"><i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i></div>${state.isCreatingRow ? renderInlineRow(null, nameLabel, hasSigla, true) : ''}<ul class="flex flex-col gap-2">${colList.filter(i=>i.name.toLowerCase().includes(state.managerSearchTerm.toLowerCase())).map(i => state.editingRowId === i.id ? renderInlineRow(i, nameLabel, hasSigla, false) : `<li class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center"><div><div class="font-bold text-slate-800">${i.name}</div>${hasSigla && i.sigla ? `<div class="text-xs font-bold bg-navy text-white border border-navy/20 px-2 py-0.5 rounded inline-block mt-1">${i.sigla}</div>` : ''}</div>${state.isAdmin ? `<div class="flex gap-2"><button onclick="startEditRow('${i.id}')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button><button onclick="requestDeleteRow('${i.id}', '${collectionKey}', '${nameLabel}')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>` : ''}</li>`).join('')}</ul></div></div>${state.isAdmin ? `<div class="fixed bottom-6 right-6"><button onclick="startCreateRow()" class="w-14 h-14 bg-orange-custom text-white rounded-full shadow-xl shadow-orange-500/30 flex items-center justify-center hover:bg-orange-dark active:scale-90 transition-all border border-white/20"><i data-lucide="plus" class="w-7 h-7"></i></button></div>` : ''}</div>`;
             }
         }
 
@@ -679,19 +690,27 @@
         };
         window.tempSelectTime = (h, m) => { if(h) window.tempTimeH = h; if(m) window.tempTimeM = m; window.updateTimeUI(); };
         window.updateTimeUI = () => {
-            document.querySelectorAll('.time-h-btn').forEach(b => b.classList.remove('bg-navy', 'text-white')); document.querySelectorAll('.time-m-btn').forEach(b => b.classList.remove('bg-navy', 'text-white'));
-            const hBtn = document.querySelector(`.time-h-btn[data-h="${window.tempTimeH}"]`); const mBtn = document.querySelector(`.time-m-btn[data-m="${window.tempTimeM}"]`);
-            if(hBtn) hBtn.classList.add('bg-navy', 'text-white'); if(mBtn) mBtn.classList.add('bg-navy', 'text-white');
+            document.querySelectorAll('.time-h-btn').forEach(b => b.classList.remove('bg-orange-custom', 'text-white')); 
+            document.querySelectorAll('.time-m-btn').forEach(b => b.classList.remove('bg-orange-custom', 'text-white'));
+            const hBtn = document.querySelector(`.time-h-btn[data-h="${window.tempTimeH}"]`); 
+            const mBtn = document.querySelector(`.time-m-btn[data-m="${window.tempTimeM}"]`);
+            if(hBtn) hBtn.classList.add('bg-orange-custom', 'text-white'); 
+            if(mBtn) mBtn.classList.add('bg-orange-custom', 'text-white');
             const preview = document.getElementById('timePreview'); if (preview) preview.textContent = `${window.tempTimeH}:${window.tempTimeM}`;
         }
         window.confirmTimeSelection = () => { const time = `${window.tempTimeH}:${window.tempTimeM}`; if (state.timePickerTarget === 'evtTime') { state.formTempTime = time; const display = document.getElementById('evtTimeDisplay'); if (display) display.textContent = time; } state.timePickerTarget = null; window.closeModal(); }
 
         window.openAdvancedFilterModal = (restore = false) => {
              const src = restore && state.tempAdvFilter ? state.tempAdvFilter : state.advancedFilter; state.tempAdvFilter = { ...src };
-             const typeOpts = `<option value="">Selecione...</option>` + state.types.map(t => `<option value="${t.id}" ${t.id === src.valType ? 'selected' : ''}>${t.name}</option>`).join('');
-             const typeSiglaOpts = `<option value="">Selecione...</option>` + state.types.filter(t => t.sigla).map(t => `<option value="${t.id}" ${t.id === src.valSigla ? 'selected' : ''}>${t.sigla}</option>`).join('');
-             const locOpts = `<option value="">Selecione...</option>` + state.locations.map(l => `<option value="${l.id}" ${l.id === src.valLoc ? 'selected' : ''}>${l.name}</option>`).join('');
-             const attOpts = `<option value="">Selecione...</option>` + state.attendants.map(a => `<option value="${a.id}" ${a.id === src.valAtt ? 'selected' : ''}>${a.name}</option>`).join('');
+             // Ordenar listas
+             const sortedTypes = sortByName(state.types);
+             const sortedLocs = sortByName(state.locations);
+             const sortedAtts = sortByName(state.attendants);
+             
+             const typeOpts = `<option value="">Selecione...</option>` + sortedTypes.map(t => `<option value="${t.id}" ${t.id === src.valType ? 'selected' : ''}>${t.name}</option>`).join('');
+             const typeSiglaOpts = `<option value="">Selecione...</option>` + sortedTypes.filter(t => t.sigla).map(t => `<option value="${t.id}" ${t.id === src.valSigla ? 'selected' : ''}>${t.sigla}</option>`).join('');
+             const locOpts = `<option value="">Selecione...</option>` + sortedLocs.map(l => `<option value="${l.id}" ${l.id === src.valLoc ? 'selected' : ''}>${l.name}</option>`).join('');
+             const attOpts = `<option value="">Selecione...</option>` + sortedAtts.map(a => `<option value="${a.id}" ${a.id === src.valAtt ? 'selected' : ''}>${a.name}</option>`).join('');
              const dateStartDisplay = src.dateStart ? formatDateFull(src.dateStart) : 'Selecione...'; const dateEndDisplay = src.dateEnd ? formatDateFull(src.dateEnd) : 'Selecione...';
              const toggleDiv = `(function(c, idInput, t){ const div = document.getElementById(c); if(t.checked) { div.classList.remove('opacity-50', 'pointer-events-none'); } else { div.classList.add('opacity-50', 'pointer-events-none'); div.querySelectorAll('select, input:not([type=checkbox]):not([type=radio])').forEach(e => {e.value=''; e.classList.remove('input-error')}); } })`;
              const toggleDate = `(function(c, t){ const div = document.getElementById(c); if(t.checked) { div.classList.remove('opacity-50', 'pointer-events-none'); } else { div.classList.add('opacity-50', 'pointer-events-none'); state.tempAdvFilter.dateStart=''; state.tempAdvFilter.dateEnd=''; document.getElementById('adv_btn_start').innerText='Selecione...'; document.getElementById('adv_btn_end').innerText='Selecione...'; document.getElementById('adv_btn_start').classList.remove('input-error'); document.getElementById('adv_btn_end').classList.remove('input-error'); } })`;
@@ -778,24 +797,16 @@
         };
 
         window.openPDFPreview = () => {
-            window.showModal(`
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
-                    <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4"><i data-lucide="file-text" class="w-8 h-8"></i></div>
-                    <h3 class="text-lg font-bold text-navy mb-2">Gerar Relatório PDF</h3>
-                    <p class="text-slate-600 mb-6 text-sm">O relatório incluirá os eventos exibidos na lista atual (com filtros aplicados).</p>
-                    <div class="flex gap-3"><button onclick="closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Cancelar</button><button onclick="confirmPDFDownload()" class="flex-1 py-3 bg-navy text-white rounded-lg font-bold shadow-lg hover:bg-navy-dark">Baixar PDF</button></div>
-                </div>
-            `);
-        };
-
-        window.confirmPDFDownload = () => {
+            // Gera o PDF em memória para preview
             const doc = new window.jspdf.jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
-            doc.setFontSize(18); doc.setTextColor(0, 51, 102);
-            doc.text("Relatório de Eventos - Adm Valente", pageWidth / 2, 20, { align: 'center' });
-            doc.setFontSize(10); doc.setTextColor(100);
+            doc.setFontSize(22); doc.setTextColor(0, 51, 102); doc.setFont("helvetica", "bold");
+            doc.text("RELATÓRIO DE EVENTOS", pageWidth / 2, 20, { align: 'center' });
+            doc.setFontSize(14);
+            doc.text("Adm Valente", pageWidth / 2, 28, { align: 'center' });
+            doc.setFontSize(10); doc.setTextColor(100); doc.setFont("helvetica", "normal");
             const filterDesc = getFilterDescription();
-            doc.text(filterDesc, pageWidth / 2, 28, { align: 'center' });
+            doc.text(filterDesc, pageWidth / 2, 36, { align: 'center' });
             const events = getFilteredEvents();
             const tableData = events.map(e => {
                 const type = window.state.types.find(t => t.id === e.typeId);
@@ -804,7 +815,56 @@
                 return [formatDateFull(e.date), e.time, type?.name || '-', loc?.name || '-', att?.name || '-'];
             });
             doc.autoTable({
-                startY: 35, head: [['Data', 'Hora', 'Evento', 'Local', 'Atendente']], body: tableData, theme: 'grid',
+                startY: 42, head: [['Data', 'Hora', 'Evento', 'Local', 'Atendente']], body: tableData, theme: 'grid',
+                headStyles: { fillColor: [0, 51, 102], textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 9, cellPadding: 3 }, alternateRowStyles: { fillColor: [241, 245, 249] }
+            });
+            
+            // Cria Blob URL para o iframe
+            const pdfBlob = doc.output('blob');
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+
+            window.showModal(`
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden">
+                    <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                        <h3 class="font-bold text-lg text-navy flex items-center gap-2">
+                           <i data-lucide="file-text" class="w-5 h-5"></i> Visualizar Relatório
+                        </h3>
+                        <button onclick="closeModal()" class="text-slate-400 hover:text-navy"><i data-lucide="x" class="w-6 h-6"></i></button>
+                    </div>
+                    <div class="flex-1 bg-slate-200 relative">
+                        <iframe src="${pdfUrl}" class="w-full h-full absolute inset-0 border-0"></iframe>
+                    </div>
+                    <div class="p-4 bg-white border-t border-slate-200 flex gap-3 justify-end">
+                        <button onclick="closeModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Fechar</button>
+                        <button onclick="confirmPDFDownload()" class="px-4 py-2 bg-navy text-white rounded-lg font-bold shadow-lg hover:bg-navy-dark flex items-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Baixar PDF</button>
+                    </div>
+                </div>
+            `);
+        };
+
+        window.confirmPDFDownload = () => {
+            const doc = new window.jspdf.jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            // Título Profissional e Centralizado
+            doc.setFontSize(22); doc.setTextColor(0, 51, 102); doc.setFont("helvetica", "bold");
+            doc.text("RELATÓRIO DE EVENTOS", pageWidth / 2, 20, { align: 'center' });
+            doc.setFontSize(14);
+            doc.text("Adm Valente", pageWidth / 2, 28, { align: 'center' });
+            
+            doc.setFontSize(10); doc.setTextColor(100); doc.setFont("helvetica", "normal");
+            const filterDesc = getFilterDescription();
+            doc.text(filterDesc, pageWidth / 2, 36, { align: 'center' });
+            
+            const events = getFilteredEvents();
+            const tableData = events.map(e => {
+                const type = window.state.types.find(t => t.id === e.typeId);
+                const loc = window.state.locations.find(l => l.id === e.locationId);
+                const att = window.state.attendants.find(a => a.id === e.attendantId);
+                return [formatDateFull(e.date), e.time, type?.name || '-', loc?.name || '-', att?.name || '-'];
+            });
+            doc.autoTable({
+                startY: 42, head: [['Data', 'Hora', 'Evento', 'Local', 'Atendente']], body: tableData, theme: 'grid',
                 headStyles: { fillColor: [0, 51, 102], textColor: 255, fontStyle: 'bold' },
                 styles: { fontSize: 9, cellPadding: 3 }, alternateRowStyles: { fillColor: [241, 245, 249] }
             });
