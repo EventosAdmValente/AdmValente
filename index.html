@@ -77,6 +77,12 @@
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+
+        /* Estilo para garantir aspecto de documento no PNG */
+        #report-capture-area {
+            max-width: 800px;
+            margin: 0 auto;
+        }
     </style>
 <script type="importmap">
 {
@@ -749,7 +755,7 @@
             state.timePickerTarget = target;
             const hours = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'));
             const minutes = Array.from({length: 12}, (_, i) => String(i * 5).padStart(2, '0')); 
-            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-4 flex flex-col"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5"></i> Selecione a Hora</h3><button onclick="window.closeModal()" class="text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button></div><div class="flex gap-4 h-64"><div class="flex-1 flex flex-col border border-slate-200 rounded overflow-hidden"><div class="bg-slate-100 text-xs font-bold text-center py-1 uppercase text-slate-500">Horas</div><div class="overflow-y-auto flex-1 bg-white p-1 gap-1 grid grid-cols-1 content-start">${hours.map(h => `<button onclick="window.tempSelectTime('${h}', null)" class="py-2 hover:bg-orange-custom/20 hover:text-navy rounded text-sm font-bold text-slate-600 time-h-btn" data-h="${h}">${h}</button>`).join('')}</div></div><div class="flex-1 flex flex-col border border-slate-200 rounded overflow-hidden"><div class="bg-slate-100 text-xs font-bold text-center py-1 uppercase text-slate-500">Minutos</div><div class="overflow-y-auto flex-1 bg-white p-1 gap-1 grid grid-cols-1 content-start">${minutes.map(m => `<button onclick="window.tempSelectTime(null, '${m}')" class="py-2 hover:bg-orange-custom/20 hover:text-navy rounded text-sm font-bold text-slate-600 time-m-btn" data-m="${m}">${m}</button>`).join('')}</div></div></div><div class="mt-4 pt-3 border-t text-center"><div id="timePreview" class="text-2xl font-black text-navy mb-3">--:--</div><button onclick="window.confirmTimeSelection()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold">Confirmar</button></div></div>`);
+            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-sm p-4 flex flex-col"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5"></i> Selecione a Hora</h3><button onclick="window.closeModal()" class="text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button></div><div class="flex gap-4 h-64"><div class="flex-1 flex flex-col border border-slate-200 rounded overflow-hidden"><div class="bg-slate-100 text-xs font-bold text-center py-1 uppercase text-slate-500">Horas</div><div class="overflow-y-auto flex-1 bg-white p-1 gap-1 grid grid-cols-1 content-start">${hours.map(h => `<button onclick="window.tempSelectTime('${h}', null)" class="py-2 hover:bg-orange-custom/20 hover:text-navy rounded text-sm font-bold text-slate-600 time-h-btn" data-h="${h}">${h}</button>`).join('')}</div></div><div class="flex-1 flex flex-col border border-slate-200 rounded overflow-hidden"><div class="bg-slate-100 text-xs font-bold text-center py-1 uppercase text-slate-500">Minutos</div><div class="overflow-y-auto flex-1 bg-white p-1 gap-1 grid grid-cols-1 content-start">${minutes.map(m => `<button onclick="window.tempSelectTime(null, '${m}')" class="py-2 hover:bg-orange-custom/20 hover:text-navy rounded text-sm font-bold text-slate-600 time-m-btn" data-m="${m}">${m}</button>`).join('')}</div></div></div><div class="mt-4 pt-3 border-t text-center"><div id="timePreview" class="text-2xl font-black text-navy mb-3">--:--</div><button onclick="window.confirmTimeSelection()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold">Confirmar</button></div></div>`);
             let currentVal = '08:00'; if(state.timePickerTarget === 'evtTime' && state.formTempTime) currentVal = state.formTempTime;
             window.tempTimeH = currentVal.split(':')[0]; window.tempTimeM = currentVal.split(':')[1]; window.updateTimeUI();
         };
@@ -953,7 +959,7 @@
                         <button onclick="window.closeModal()" class="text-slate-400 hover:text-navy"><i data-lucide="x" class="w-6 h-6"></i></button>
                     </div>
                     <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100">
-                        <div id="report-capture-area" class="bg-white shadow-sm border border-slate-200 p-6 rounded-lg min-h-[300px]">
+                        <div id="report-capture-area" class="bg-white shadow-sm border border-slate-200 p-8 rounded-lg min-h-[400px]">
                             <div class="text-center mb-6 border-b border-slate-100 pb-4">
                                 <h2 class="text-xl sm:text-2xl font-black text-navy uppercase tracking-wide mb-1">Lista de Eventos</h2>
                                 <h3 class="text-base sm:text-lg font-medium text-slate-600">Adm Valente</h3>
@@ -984,11 +990,11 @@
                         </div>
                     </div>
                     <div class="p-4 bg-white border-t border-slate-200 flex flex-col gap-3 shrink-0">
-                        <div class="flex gap-3 justify-end">
-                            <button onclick="window.confirmPNGDownload()" class="flex-1 sm:flex-none px-4 py-2 bg-navy text-white rounded-lg font-bold shadow hover:bg-navy-dark flex items-center justify-center gap-2">
+                        <div class="flex gap-3 justify-center">
+                            <button onclick="window.confirmPNGDownload()" class="flex-1 px-4 py-2.5 bg-navy text-white rounded-lg font-bold shadow-lg hover:bg-navy-dark flex items-center justify-center gap-2 transition-all">
                                 <i data-lucide="image" class="w-4 h-4"></i> Baixar PNG
                             </button>
-                            <button onclick="window.confirmPDFDownload()" class="flex-1 sm:flex-none px-4 py-2 bg-navy text-white rounded-lg font-bold shadow hover:bg-navy-dark flex items-center justify-center gap-2">
+                            <button onclick="window.confirmPDFDownload()" class="flex-1 px-4 py-2.5 bg-navy text-white rounded-lg font-bold shadow-lg hover:bg-navy-dark flex items-center justify-center gap-2 transition-all">
                                 <i data-lucide="download" class="w-4 h-4"></i> Baixar PDF
                             </button>
                         </div>
@@ -1034,15 +1040,20 @@
             const element = document.getElementById('report-capture-area');
             if (!element) return;
 
+            // Para garantir que o PNG tenha proporções de documento semelhantes ao PDF,
+            // forçamos uma escala alta e capturamos o elemento com seu layout atual,
+            // que já está configurado como um bloco de documento centralizado.
             window.html2canvas(element, {
-                scale: 2, 
+                scale: 3, // Alta resolução (aprox 2400px de largura se for 800px no CSS)
                 useCORS: true,
                 backgroundColor: '#ffffff',
-                logging: false
+                logging: false,
+                scrollX: 0,
+                scrollY: -window.scrollY // Corrige problemas se a página estiver scrollada
             }).then(canvas => {
                 const link = document.createElement('a');
                 link.download = `agenda-valente-${new Date().toISOString().split('T')[0]}.png`;
-                link.href = canvas.toDataURL('image/png');
+                link.href = canvas.toDataURL('image/png', 1.0);
                 link.click();
                 window.closeModal();
             }).catch(err => {
