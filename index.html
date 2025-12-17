@@ -77,13 +77,6 @@
             to { transform: rotate(360deg); }
         }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "firebase/": "https://esm.sh/firebase@^12.7.0/"
-  }
-}
-</script>
 </head>
 <body class="h-screen w-full flex flex-col bg-slate-100">
 
@@ -176,7 +169,17 @@
                     if (!['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm', 'formTempDate', 'formTempTime'].includes(property)) { 
                         renderApp(); 
                     } else { 
-                        if (property === 'searchTerm') { renderHome(); window.renderIcons(); }
+                        if (property === 'searchTerm') { 
+                             // Ao pesquisar, apenas limpamos filtros conflitantes no objeto target
+                            if (value) {
+                                target.advancedFilter.active = false;
+                                target.isViewAll = false;
+                                target.selectedDate = null;
+                                target.filterStartDate = '';
+                                target.filterEndDate = '';
+                            }
+                            window.updateHomeList(); 
+                        }
                         if (property === 'managerSearchTerm') renderApp(); 
                         if (property === 'formTempDate' || property === 'formTempTime') renderEventForm(); 
                     }
@@ -191,6 +194,11 @@
         function formatDateFull(dateStr) { if (!dateStr) return ''; const parts = dateStr.split('-'); if (parts.length !== 3) return dateStr; return `${parts[2]}/${parts[1]}/${parts[0]}`; }
         function isEventPast(date, time) { return new Date(`${date}T${time}`) < new Date(); }
         
+        function normalizeStr(str) {
+            if (!str) return "";
+            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        }
+
         window.renderIcons = () => { if(window.lucide) window.lucide.createIcons(); }
 
         // --- RENDERIZADORES ---
@@ -210,6 +218,7 @@
             }
             window.renderIcons();
         };
+        window.renderApp = renderApp;
 
         // Home Screen
         function renderHome() {
@@ -226,7 +235,7 @@
                     <div id="nav-menu-placeholder"></div>
                     
                     <div class="bg-navy text-white p-4 sticky top-0 z-10 shadow-lg flex justify-between items-center flex-shrink-0">
-                        <button onclick="state.isMenuOpen = true; renderApp()" class="p-1 hover:bg-white/10 rounded">
+                        <button onclick="window.openMenu()" class="p-1 hover:bg-white/10 rounded">
                             <i data-lucide="menu" class="w-7 h-7"></i>
                         </button>
                         <h1 class="text-lg font-bold uppercase tracking-wide">Eventos Adm Valente</h1>
@@ -274,15 +283,8 @@
                 const searchInput = document.getElementById('homeSearch');
                 if (searchInput) {
                     searchInput.addEventListener('input', (e) => { 
+                         // Apenas atualiza o state. O Proxy chama updateHomeList.
                         state.searchTerm = e.target.value; 
-                        if(e.target.value) { 
-                            state.advancedFilter.active = false; 
-                            state.isViewAll = false;
-                            state.selectedDate = null;
-                            state.filterStartDate = '';
-                            state.filterEndDate = '';
-                            renderApp(); 
-                        }
                     });
                 }
             }
@@ -296,6 +298,10 @@
             const fabContainer = document.getElementById('fab-container'); 
             if(fabContainer) fabContainer.innerHTML = state.isAdmin ? `<button onclick="startCreateEvent()" class="fixed bottom-6 right-6 w-14 h-14 bg-orange-custom text-white rounded-full shadow-xl shadow-orange-500/30 flex items-center justify-center hover:bg-orange-dark active:scale-90 transition-all z-50 border border-white/20"><i data-lucide="plus" class="w-7 h-7"></i></button>` : '';
             
+            window.updateHomeList();
+        }
+
+        window.updateHomeList = () => {
             const filteredEvents = getFilteredEvents(); 
             let listHeader = getFilterDescription();
             const listContainer = document.getElementById('event-list-container');
@@ -343,22 +349,74 @@
                     </div>
                 `;
             }
+            window.renderIcons();
         }
 
         // Generic Manager (Types, Locs, Attendants)
         function renderGenericManager(title, collectionKey, nameLabel, hasSigla) { 
             const appElement = document.getElementById('app'); 
             if(appElement) {
-                // Ordenação alfabética na lista de gerenciamento
                 const colList = (state[collectionKey] || []).sort((a, b) => a.name.localeCompare(b.name));
                 
-                appElement.innerHTML = `<div class="flex flex-col h-screen bg-slate-100"><div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10"><button onclick="navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button><h1 class="font-bold uppercase tracking-wide">${title}</h1></div><div class="p-4 flex-1 overflow-y-auto max-w-xl mx-auto w-full"><div class="bg-white p-5 rounded-xl shadow-md border border-slate-200 flex flex-col gap-2"><div class="relative mb-4"><input id="managerSearch" type="text" placeholder="Buscar..." class="w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-navy/20" value="${state.managerSearchTerm}" oninput="state.managerSearchTerm = this.value"><i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i></div>${state.isCreatingRow ? renderInlineRow(null, nameLabel, hasSigla, true) : ''}<ul class="flex flex-col gap-2">${colList.filter((i)=>i.name.toLowerCase().includes(state.managerSearchTerm.toLowerCase())).map((i) => state.editingRowId === i.id ? renderInlineRow(i, nameLabel, hasSigla, false) : `<li class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center"><div><div class="font-bold text-slate-800">${i.name}</div>${hasSigla && i.sigla ? `<div class="text-xs font-black bg-slate-200 border border-slate-300 text-slate-700 px-2 py-0.5 rounded inline-block mt-1">${i.sigla}</div>` : ''}</div>${state.isAdmin ? `<div class="flex gap-2"><button onclick="startEditRow('${i.id}')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button><button onclick="requestDeleteRow('${i.id}', '${collectionKey}', '${nameLabel}')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>` : ''}</li>`).join('')}</ul></div></div>${state.isAdmin ? `<div class="fixed bottom-6 right-6"><button onclick="startCreateRow()" class="w-14 h-14 bg-orange-custom text-white rounded-full shadow-xl shadow-orange-500/30 flex items-center justify-center hover:bg-orange-dark active:scale-90 transition-all border border-white/20"><i data-lucide="plus" class="w-7 h-7"></i></button></div>` : ''}</div>`;
+                let iconName = 'folder';
+                if (collectionKey === 'types') iconName = 'tag';
+                if (collectionKey === 'locations') iconName = 'map-pin';
+                if (collectionKey === 'attendants') iconName = 'user';
+
+                appElement.innerHTML = `
+                    <div class="flex flex-col h-screen bg-slate-100">
+                        <div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10 flex-shrink-0">
+                            <button onclick="navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button>
+                            <h1 class="font-bold uppercase tracking-wide">${title}</h1>
+                        </div>
+                        <div class="p-4 flex-1 overflow-hidden flex flex-col gap-4 max-w-xl mx-auto w-full">
+                            <div class="relative shrink-0">
+                                <input id="managerSearch" type="text" placeholder="Buscar..." class="w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-navy/20" value="${state.managerSearchTerm}" oninput="state.managerSearchTerm = this.value">
+                                <i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
+                            </div>
+                            
+                            ${state.isCreatingRow ? renderInlineRow(null, nameLabel, hasSigla, true) : ''}
+                            
+                            <div class="flex-1 overflow-y-auto border border-slate-200 bg-slate-50 rounded-xl shadow-md min-h-0">
+                                <ul class="divide-y divide-slate-200/50">
+                                    ${colList.filter((i)=>i.name.toLowerCase().includes(state.managerSearchTerm.toLowerCase())).map((i) => {
+                                        if (state.editingRowId === i.id) {
+                                            return `<li class="p-3 bg-blue-50/50">${renderInlineRow(i, nameLabel, hasSigla, false)}</li>`;
+                                        }
+                                        return `
+                                            <li class="p-3 border-b border-slate-200/50 last:border-0 bg-white hover:bg-slate-50 transition-colors">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-10 h-10 rounded-full bg-blue-50 text-navy flex items-center justify-center border border-blue-100 shrink-0">
+                                                        <i data-lucide="${iconName}" class="w-5 h-5"></i>
+                                                    </div>
+                                                    <div class="flex-1 min-w-0">
+                                                        <div class="flex items-center justify-between">
+                                                            <span class="font-bold text-navy text-sm sm:text-base truncate">${i.name}</span>
+                                                            ${hasSigla && i.sigla ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 ml-2 border border-slate-300">${i.sigla}</span>` : ''}
+                                                        </div>
+                                                    </div>
+                                                    ${state.isAdmin ? `
+                                                    <div class="flex gap-1 shrink-0">
+                                                        <button onclick="startEditRow('${i.id}')" class="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                                                        <button onclick="requestDeleteRow('${i.id}', '${collectionKey}', '${nameLabel}')" class="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                                    </div>` : ''}
+                                                </div>
+                                            </li>
+                                        `;
+                                    }).join('')}
+                                </ul>
+                                ${colList.length === 0 ? `<div class="p-8 text-center text-slate-400 italic">Nenhum registro encontrado.</div>` : ''}
+                            </div>
+                        </div>
+                        ${state.isAdmin ? `<div class="fixed bottom-6 right-6"><button onclick="startCreateRow()" class="w-14 h-14 bg-orange-custom text-white rounded-full shadow-xl shadow-orange-500/30 flex items-center justify-center hover:bg-orange-dark active:scale-90 transition-all border border-white/20"><i data-lucide="plus" class="w-7 h-7"></i></button></div>` : ''}
+                    </div>
+                `;
             }
         }
 
         // Inline Row Editor
         function renderInlineRow(item, lbl, sigla, isNew) { 
-            return `<div class="bg-blue-50 p-4 rounded-xl mb-3 border-2 border-blue-200 animate-in fade-in slide-in-from-top-2"><div class="mb-2"><label class="text-xs font-bold text-navy uppercase block mb-1">${lbl}</label><input id="editNameInput" class="w-full p-2 border border-blue-300 rounded bg-white" placeholder="Nome" value="${isNew ? state.tempName : (state.tempName || item.name)}" oninput="state.tempName=this.value"></div>${sigla ? `<div class="mb-3"><label class="text-xs font-bold text-navy uppercase block mb-1">Sigla</label><input class="w-full p-2 border border-blue-300 rounded bg-white uppercase" placeholder="SIGLA" maxlength="5" value="${isNew ? state.tempSigla : (state.tempSigla || item.sigla)}" oninput="state.tempSigla=this.value.toUpperCase()"></div>` : ''}<div class="flex gap-2"><button onclick="saveGenericRow('${isNew?'':item.id}', '${sigla}')" class="flex-1 bg-green-600 text-white py-2 rounded font-bold shadow-sm hover:bg-green-700">Salvar</button><button onclick="cancelGenericEdit()" class="flex-1 bg-red-400 text-white py-2 rounded font-bold shadow-sm hover:bg-red-500">Cancelar</button></div></div>`; 
+            return `<div class="bg-blue-50 p-4 rounded-xl border-2 border-blue-200 animate-in fade-in slide-in-from-top-2 shadow-lg"><div class="mb-2"><label class="text-xs font-bold text-navy uppercase block mb-1">${lbl}</label><input id="editNameInput" class="w-full p-2 border border-blue-300 rounded bg-white focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Nome" value="${isNew ? window.state.tempName : (window.state.tempName || item.name)}" oninput="window.state.tempName=this.value"></div>${sigla ? `<div class="mb-3"><label class="text-xs font-bold text-navy uppercase block mb-1">Sigla</label><input class="w-full p-2 border border-blue-300 rounded bg-white uppercase focus:ring-2 focus:ring-blue-200 outline-none" placeholder="SIGLA" maxlength="5" value="${isNew ? window.state.tempSigla : (window.state.tempSigla || item.sigla)}" oninput="window.state.tempSigla=this.value.toUpperCase()"></div>` : ''}<div class="flex gap-2"><button onclick="window.saveGenericRow('${isNew?'':item.id}', '${sigla}')" class="flex-1 bg-green-600 text-white py-2 rounded font-bold shadow-sm hover:bg-green-700">Salvar</button><button onclick="window.cancelGenericEdit()" class="flex-1 bg-red-400 text-white py-2 rounded font-bold shadow-sm hover:bg-red-500">Cancelar</button></div></div>`; 
         }
 
         // Event Form
@@ -403,7 +461,7 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1">Data <span class="text-red-500">*</span></label>
-                                <button type="button" id="btnDate" onclick="state.pickerTarget='evtDate'; window.openAgendaModal()" class="w-full p-3 border border-slate-300 rounded-lg text-left text-slate-800 bg-white flex items-center gap-2 transition-colors">
+                                <button type="button" id="btnDate" onclick="window.openFormDate()" class="w-full p-3 border border-slate-300 rounded-lg text-left text-slate-800 bg-white flex items-center gap-2 transition-colors">
                                     <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i> ${dateDisplay}
                                 </button>
                             </div>
@@ -448,7 +506,7 @@
 
         function renderNavMenu() { 
             if (!state.isMenuOpen) return ''; 
-            return `<div class="fixed inset-0 z-50 transition-opacity duration-300"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="state.isMenuOpen = false; renderApp()"></div><div class="relative w-72 h-full bg-navy text-white flex flex-col shadow-2xl slide-in"><div class="p-6 border-b border-white/10 flex justify-between bg-[#002855]"><h2 class="text-xl font-bold">Menu</h2><button onclick="state.isMenuOpen = false; renderApp()" class="hover:text-orange-custom"><i data-lucide="x"></i></button></div><nav class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">${[{id: 'home', icon: 'calendar', label: 'Tela Inicial'}, {id: 'types', icon: 'tag', label: 'Tipos de Eventos'}, {id: 'locations', icon: 'map-pin', label: 'Localidades'}, {id: 'attendants', icon: 'users', label: 'Atendentes'}, {id: 'about', icon: 'info', label: 'Sobre'}].map(i => `<button onclick="navigateTo('${i.id}')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 gap-3 border-l-4 border-transparent hover:border-orange-custom"><i data-lucide="${i.icon}" class="text-orange-custom"></i><span class="font-medium">${i.label}</span></button>`).join('')}</nav><div class="p-4 border-t border-white/10 bg-[#002244]">${state.user ? `<div class="text-xs text-slate-400 mb-2 truncate">${state.user.email}</div><button onclick="handleLogout()" class="w-full flex justify-center gap-2 px-4 py-3 bg-red-600/20 hover:bg-red-600/40 text-red-200 rounded-lg font-bold"><i data-lucide="log-out" class="w-4 h-4"></i> Sair</button>` : `<button onclick="showLoginModal()" class="w-full flex justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg font-bold"><i data-lucide="lock" class="w-4 h-4"></i> Login</button>`}</div></div></div>`; 
+            return `<div class="fixed inset-0 z-50 transition-opacity duration-300"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="window.closeMenu()"></div><div class="relative w-72 h-full bg-navy text-white flex flex-col shadow-2xl slide-in"><div class="p-6 border-b border-white/10 flex justify-between bg-[#002855]"><h2 class="text-xl font-bold">Menu</h2><button onclick="window.closeMenu()" class="hover:text-orange-custom"><i data-lucide="x"></i></button></div><nav class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">${[{id: 'home', icon: 'calendar', label: 'Tela Inicial'}, {id: 'types', icon: 'tag', label: 'Tipos de Eventos'}, {id: 'locations', icon: 'map-pin', label: 'Localidades'}, {id: 'attendants', icon: 'users', label: 'Atendentes'}, {id: 'about', icon: 'info', label: 'Sobre'}].map(i => `<button onclick="navigateTo('${i.id}')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 gap-3 border-l-4 border-transparent hover:border-orange-custom"><i data-lucide="${i.icon}" class="text-orange-custom"></i><span class="font-medium">${i.label}</span></button>`).join('')}</nav><div class="p-4 border-t border-white/10 bg-[#002244]">${state.user ? `<div class="text-xs text-slate-400 mb-2 truncate">${state.user.email}</div><button onclick="handleLogout()" class="w-full flex justify-center gap-2 px-4 py-3 bg-red-600/20 hover:bg-red-600/40 text-red-200 rounded-lg font-bold"><i data-lucide="log-out" class="w-4 h-4"></i> Sair</button>` : `<button onclick="showLoginModal()" class="w-full flex justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg font-bold"><i data-lucide="lock" class="w-4 h-4"></i> Login</button>`}</div></div></div>`; 
         }
 
         function renderAbout() { 
@@ -489,6 +547,18 @@
                 };
             }
         }
+        
+        // GLOBAL MENU OPENER
+        window.openMenu = () => {
+            state.isMenuOpen = true;
+            renderApp();
+        };
+
+        // GLOBAL MENU CLOSER
+        window.closeMenu = () => {
+            state.isMenuOpen = false;
+            // renderApp is triggered by proxy setter
+        };
 
         window.showLoginModal = () => { 
             window.state.isMenuOpen = false; 
@@ -557,10 +627,10 @@
                         const loc = state.locations.find(l => l.id === e.locationId);
                         const att = state.attendants.find(a => a.id === e.attendantId);
                         matchesSearch = (
-                            (type?.name.toLowerCase().includes(lowerTerm)) || 
-                            (type?.sigla?.toLowerCase().includes(lowerTerm)) || 
-                            (loc?.name.toLowerCase().includes(lowerTerm)) || 
-                            (att?.name.toLowerCase().includes(lowerTerm))
+                            ((type?.name || '').toLowerCase().includes(lowerTerm)) || 
+                            ((type?.sigla || '').toLowerCase().includes(lowerTerm)) || 
+                            ((loc?.name || '').toLowerCase().includes(lowerTerm)) || 
+                            ((att?.name || '').toLowerCase().includes(lowerTerm))
                         );
                     }
                     let matchesDate = true;
@@ -583,9 +653,9 @@
         }
 
         function getFilterDescription() {
-            if (state.advancedFilter.active) return "Eventos Filtrados (Avançado)"; 
+            if (state.advancedFilter.active) return "Eventos Filtrados"; 
             if (state.searchTerm) return "Resultados da Pesquisa"; 
-            if (state.selectedDate) return `Eventos de: ${formatDateFull(state.selectedDate)}`;
+            if (state.selectedDate) return `Eventos do dia: ${formatDate(state.selectedDate)}`;
             return "Todos os Eventos";
         }
 
@@ -621,6 +691,9 @@
             if (state.pickerTarget) { 
                 if (state.pickerTarget.startsWith('TEMP_')) {
                     const field = state.pickerTarget.replace('TEMP_', ''); 
+                    
+                    if (!state.tempAdvFilter) state.tempAdvFilter = { ...state.advancedFilter };
+
                     if (field === 'adv_dateStart') state.tempAdvFilter.dateStart = d; 
                     if (field === 'adv_dateEnd') state.tempAdvFilter.dateEnd = d;
                     state.pickerTarget = null; 
@@ -670,6 +743,22 @@
         window.confirmTimeSelection = () => { const time = `${window.tempTimeH}:${window.tempTimeM}`; if (state.timePickerTarget === 'evtTime') { state.formTempTime = time; const display = document.getElementById('evtTimeDisplay'); if (display) display.textContent = time; } state.timePickerTarget = null; window.closeModal(); }
 
         // Advanced Filter
+        window.updateAdvFilterState = (field, value, clearFields = []) => {
+            // Safety check: if null, re-initialize from current active filter or defaults
+            if (!state.tempAdvFilter) {
+                state.tempAdvFilter = { ...state.advancedFilter };
+            }
+            
+            state.tempAdvFilter[field] = value;
+            
+            // Clear dependent fields if unchecking
+            if (!value && typeof value === 'boolean' && clearFields.length > 0) {
+                clearFields.forEach(f => {
+                    if (f) state.tempAdvFilter[f] = '';
+                });
+            }
+        }
+
         window.openAdvancedFilterModal = (restore = false) => {
             const src = restore && state.tempAdvFilter ? state.tempAdvFilter : state.advancedFilter; state.tempAdvFilter = { ...src };
             
@@ -687,7 +776,8 @@
             const dateStartDisplay = src.dateStart ? formatDateFull(src.dateStart) : 'Selecione...'; 
             const dateEndDisplay = src.dateEnd ? formatDateFull(src.dateEnd) : 'Selecione...';
             
-            const toggleDiv = `(function(c, idInput, t){ 
+            // Helper functions (injected as string) to handle visual toggling
+            const toggleDiv = `(function(c, t){ 
                 const div = document.getElementById(c); 
                 if(t.checked) { 
                     div.classList.remove('opacity-50', 'pointer-events-none'); 
@@ -710,6 +800,15 @@
                     document.getElementById('adv_btn_end').classList.remove('input-error');
                 }
             })`;
+            
+            // Helper to update boolean state safely using window.updateAdvFilterState
+            const updateBool = (prop, clearProp1 = '', clearProp2 = '') => {
+                const clears = [clearProp1, clearProp2].filter(c => c).map(c => `'${c}'`).join(',');
+                return `window.updateAdvFilterState('${prop}', this.checked, [${clears}]);`;
+            }
+            
+            // Helper to update string inputs safely
+            const updateStr = (prop) => `window.updateAdvFilterState('${prop}', this.value); this.classList.remove('input-error');`;
 
             window.showModal(`
                 <div id="advanced-filter-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-md p-0 overflow-hidden flex flex-col max-h-[90vh]">
@@ -721,36 +820,54 @@
                     <div class="p-3 overflow-y-auto flex-1 flex flex-col gap-2 bg-slate-50">
                         <div class="bg-white p-2 rounded shadow-sm border border-slate-200">
                             <div class="flex items-center justify-between mb-1">
-                                <div class="flex items-center gap-2"><input type="checkbox" id="adv_useStatus" class="w-4 h-4 rounded text-navy focus:ring-navy" ${src.useStatus ? 'checked' : ''} onchange="${toggleDiv}('statusContent', null, this)"><label for="adv_useStatus" class="font-bold text-navy text-xs uppercase">Status</label></div>
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" id="adv_useStatus" class="w-4 h-4 rounded text-navy focus:ring-navy" ${src.useStatus ? 'checked' : ''} onchange="${updateBool('useStatus', 'statusVal')} ${toggleDiv}('statusContent', this)">
+                                    <label for="adv_useStatus" class="font-bold text-navy text-xs uppercase">Status</label>
+                                </div>
                                 <div id="statusContent" class="flex gap-3 ${!src.useStatus ? 'opacity-50 pointer-events-none' : ''}">
-                                    <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="adv_radioStatus" value="active" ${src.statusVal === 'active' ? 'checked' : ''}><span class="text-xs font-medium">Ativos</span></label>
-                                    <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="adv_radioStatus" value="inactive" ${src.statusVal === 'inactive' ? 'checked' : ''}><span class="text-xs font-medium">Inativos</span></label>
+                                    <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="adv_radioStatus" value="active" ${src.statusVal === 'active' ? 'checked' : ''} onchange="window.updateAdvFilterState('statusVal', this.value)"><span class="text-xs font-medium">Ativos</span></label>
+                                    <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="adv_radioStatus" value="inactive" ${src.statusVal === 'inactive' ? 'checked' : ''} onchange="window.updateAdvFilterState('statusVal', this.value)"><span class="text-xs font-medium">Inativos</span></label>
                                 </div>
                             </div>
                         </div>
                         <div class="bg-white p-2 rounded shadow-sm border border-slate-200">
-                            <div class="flex items-center gap-2 mb-2"><input type="checkbox" id="adv_useGroupType" class="w-4 h-4 rounded text-navy focus:ring-navy" ${src.useGroupType ? 'checked' : ''} onchange="${toggleDiv}('groupTypeContent', null, this)"><label for="adv_useGroupType" class="font-bold text-navy text-xs uppercase">Tipo/Sigla</label></div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <input type="checkbox" id="adv_useGroupType" class="w-4 h-4 rounded text-navy focus:ring-navy" ${src.useGroupType ? 'checked' : ''} onchange="${updateBool('useGroupType', 'valType', 'valSigla')} ${toggleDiv}('groupTypeContent', this)">
+                                <label for="adv_useGroupType" class="font-bold text-navy text-xs uppercase">Tipo/Sigla</label>
+                            </div>
                             <div id="groupTypeContent" class="flex flex-col gap-2 transition-opacity ${!src.useGroupType ? 'opacity-50 pointer-events-none' : ''}">
-                                <div class="flex gap-4"><label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="adv_radioType" value="type" ${src.selectedRadio === 'type' ? 'checked' : ''} onchange="document.getElementById('adv_div_type').classList.remove('hidden'); document.getElementById('adv_div_sigla').classList.add('hidden')"><span class="text-xs font-medium">Nome</span></label><label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="adv_radioType" value="sigla" ${src.selectedRadio === 'sigla' ? 'checked' : ''} onchange="document.getElementById('adv_div_type').classList.add('hidden'); document.getElementById('adv_div_sigla').classList.remove('hidden')"><span class="text-xs font-medium">Sigla</span></label></div>
-                                <div id="adv_div_type" class="${src.selectedRadio === 'type' ? '' : 'hidden'}"><select id="adv_valType" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:border-navy outline-none" onchange="this.classList.remove('input-error')">${typeOpts}</select></div>
-                                <div id="adv_div_sigla" class="${src.selectedRadio === 'sigla' ? '' : 'hidden'}"><select id="adv_valSigla" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:border-navy outline-none" onchange="this.classList.remove('input-error')">${typeSiglaOpts}</select></div>
+                                <div class="flex gap-4">
+                                    <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="adv_radioType" value="type" ${src.selectedRadio === 'type' ? 'checked' : ''} onchange="window.updateAdvFilterState('selectedRadio', 'type'); document.getElementById('adv_div_type').classList.remove('hidden'); document.getElementById('adv_div_sigla').classList.add('hidden')"><span class="text-xs font-medium">Nome</span></label>
+                                    <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="adv_radioType" value="sigla" ${src.selectedRadio === 'sigla' ? 'checked' : ''} onchange="window.updateAdvFilterState('selectedRadio', 'sigla'); document.getElementById('adv_div_type').classList.add('hidden'); document.getElementById('adv_div_sigla').classList.remove('hidden')"><span class="text-xs font-medium">Sigla</span></label>
+                                </div>
+                                <div id="adv_div_type" class="${src.selectedRadio === 'type' ? '' : 'hidden'}"><select id="adv_valType" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:border-navy outline-none" onchange="${updateStr('valType')}">${typeOpts}</select></div>
+                                <div id="adv_div_sigla" class="${src.selectedRadio === 'sigla' ? '' : 'hidden'}"><select id="adv_valSigla" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:border-navy outline-none" onchange="${updateStr('valSigla')}">${typeSiglaOpts}</select></div>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <div class="bg-white p-2 rounded shadow-sm border border-slate-200">
-                                <div class="flex items-center gap-2 mb-1"><input type="checkbox" id="adv_useLoc" class="w-4 h-4 rounded text-navy" ${src.useLoc ? 'checked' : ''} onchange="${toggleDiv}('adv_div_loc', 'adv_valLoc', this)"><label for="adv_useLoc" class="font-bold text-navy text-xs uppercase">Local</label></div>
-                                <div id="adv_div_loc" class="transition-opacity ${!src.useLoc ? 'opacity-50 pointer-events-none' : ''}"><select id="adv_valLoc" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:border-navy outline-none" onchange="this.classList.remove('input-error')">${locOpts}</select></div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <input type="checkbox" id="adv_useLoc" class="w-4 h-4 rounded text-navy" ${src.useLoc ? 'checked' : ''} onchange="${updateBool('useLoc', 'valLoc')} ${toggleDiv}('adv_div_loc', this)">
+                                    <label for="adv_useLoc" class="font-bold text-navy text-xs uppercase">Local</label>
+                                </div>
+                                <div id="adv_div_loc" class="transition-opacity ${!src.useLoc ? 'opacity-50 pointer-events-none' : ''}"><select id="adv_valLoc" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:border-navy outline-none" onchange="${updateStr('valLoc')}">${locOpts}</select></div>
                             </div>
                             <div class="bg-white p-2 rounded shadow-sm border border-slate-200">
-                                <div class="flex items-center gap-2 mb-1"><input type="checkbox" id="adv_useAtt" class="w-4 h-4 rounded text-navy" ${src.useAtt ? 'checked' : ''} onchange="${toggleDiv}('adv_div_att', 'adv_valAtt', this)"><label for="adv_useAtt" class="font-bold text-navy text-xs uppercase">Atendente</label></div>
-                                <div id="adv_div_att" class="transition-opacity ${!src.useAtt ? 'opacity-50 pointer-events-none' : ''}"><select id="adv_valAtt" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:border-navy outline-none" onchange="this.classList.remove('input-error')">${attOpts}</select></div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <input type="checkbox" id="adv_useAtt" class="w-4 h-4 rounded text-navy" ${src.useAtt ? 'checked' : ''} onchange="${updateBool('useAtt', 'valAtt')} ${toggleDiv}('adv_div_att', this)">
+                                    <label for="adv_useAtt" class="font-bold text-navy text-xs uppercase">Atendente</label>
+                                </div>
+                                <div id="adv_div_att" class="transition-opacity ${!src.useAtt ? 'opacity-50 pointer-events-none' : ''}"><select id="adv_valAtt" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:border-navy outline-none" onchange="${updateStr('valAtt')}">${attOpts}</select></div>
                             </div>
                         </div>
                         <div class="bg-white p-2 rounded shadow-sm border border-slate-200">
-                            <div class="flex items-center gap-2 mb-2"><input type="checkbox" id="adv_useDate" class="w-4 h-4 rounded text-navy" ${src.useDate ? 'checked' : ''} onchange="${toggleDate}('adv_div_date', this)"><label for="adv_useDate" class="font-bold text-navy text-xs uppercase">Datas</label></div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <input type="checkbox" id="adv_useDate" class="w-4 h-4 rounded text-navy" ${src.useDate ? 'checked' : ''} onchange="${updateBool('useDate', 'dateStart', 'dateEnd')} ${toggleDate}('adv_div_date', this)">
+                                <label for="adv_useDate" class="font-bold text-navy text-xs uppercase">Datas</label>
+                            </div>
                             <div id="adv_div_date" class="grid grid-cols-2 gap-2 transition-opacity ${!src.useDate ? 'opacity-50 pointer-events-none' : ''}">
-                                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">De</label><button type="button" id="adv_btn_start" onclick="state.tempAdvFilter.useDate = true; state.pickerTarget='TEMP_adv_dateStart'; window.openAgendaModal()" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white text-left text-slate-700 truncate">${dateStartDisplay}</button></div>
-                                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Até</label><button type="button" id="adv_btn_end" onclick="state.tempAdvFilter.useDate = true; state.pickerTarget='TEMP_adv_dateEnd'; window.openAgendaModal()" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white text-left text-slate-700 truncate">${dateEndDisplay}</button></div>
+                                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">De</label><button type="button" id="adv_btn_start" onclick="window.openFilterDate('adv_dateStart')" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white text-left text-slate-700 truncate">${dateStartDisplay}</button></div>
+                                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Até</label><button type="button" id="adv_btn_end" onclick="window.openFilterDate('adv_dateEnd')" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white text-left text-slate-700 truncate">${dateEndDisplay}</button></div>
                             </div>
                         </div>
                     </div>
@@ -763,7 +880,11 @@
             if (!t) return;
             
             let isValid = true;
+            // Limpa erros anteriores
+            document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
 
+            // Validações acumulativas
+            // Tipo/Sigla
             if (t.useGroupType) {
                 if (t.selectedRadio === 'type' && !t.valType) {
                     document.getElementById('adv_valType')?.classList.add('input-error');
@@ -774,14 +895,20 @@
                     isValid = false;
                 }
             }
+
+            // Local
             if (t.useLoc && !t.valLoc) {
                 document.getElementById('adv_valLoc')?.classList.add('input-error');
                 isValid = false;
             }
+
+            // Atendente
             if (t.useAtt && !t.valAtt) {
                 document.getElementById('adv_valAtt')?.classList.add('input-error');
                 isValid = false;
             }
+
+            // Datas
             if (t.useDate) {
                 if (!t.dateStart) {
                     document.getElementById('adv_btn_start')?.classList.add('input-error');
@@ -793,10 +920,13 @@
                 }
             }
 
-            if (!isValid) return;
+            if (!isValid) return; // Se houver qualquer erro, aborta.
 
+            // Se válido, aplica
             state.advancedFilter = { ...t, active: true };
             state.tempAdvFilter = null;
+            
+            // Limpa filtros simples para priorizar o avançado
             state.searchTerm = '';
             state.selectedDate = null;
             state.filterStartDate = '';
@@ -890,7 +1020,13 @@
                 const type = window.state.types.find(t => t.id === e.typeId);
                 const loc = window.state.locations.find(l => l.id === e.locationId);
                 const att = window.state.attendants.find(a => a.id === e.attendantId);
-                return [formatDateFull(e.date), e.time, type?.name || '-', loc?.name || '-', att?.name || '-'];
+                return [
+                    formatDateFull(e.date),
+                    e.time,
+                    type?.name || '-',
+                    loc?.name || '-',
+                    att?.name || '-'
+                ];
             });
             doc.autoTable({
                 startY: 35,
@@ -921,11 +1057,17 @@
         }
 
         window.startEditRow = (id) => {
-            state.isCreatingRow = false;
-            state.editingRowId = id;
-            state.tempName = '';
-            state.tempSigla = '';
-            renderApp();
+            const screen = state.currentScreen;
+            const key = window.getCollectionKeyByScreen(screen);
+            const list = state[key];
+            const item = list.find((i) => i.id === id);
+            if(item) {
+                state.isCreatingRow = false;
+                state.editingRowId = id;
+                state.tempName = item.name;
+                state.tempSigla = item.sigla || '';
+                renderApp();
+            }
         }
 
         window.cancelGenericEdit = () => {
@@ -1002,10 +1144,32 @@
                 catch (e) { if (e.code === 'permission-denied') { alert("Erro de Permissão."); } else { alert("Erro ao excluir."); } }
             });
         };
+        
+        // Listener de Navegação (Botão Voltar)
+        window.addEventListener('popstate', (event) => {
+            const screen = event.state && event.state.screen ? event.state.screen : 'home';
+            state.isMenuOpen = false;
+            state.currentScreen = screen;
+            if (screen === 'home') {
+                state.editingEventId = null;
+                state.isCreatingRow = false;
+                state.editingRowId = null;
+                state.tempName = '';
+                state.tempSigla = '';
+                state.formTempDate = '';
+                state.formTempTime = '';
+            }
+            renderApp();
+        });
 
         // --- INIT ---
         (async function init() {
             await initPersistence();
+
+            // Inicializa histórico
+            if (!history.state) {
+                history.replaceState({ screen: 'home' }, '', '');
+            }
 
             auth.onAuthStateChanged((user) => {
                 state.user = user ? { uid: user.uid, email: user.email } : null;
@@ -1023,6 +1187,39 @@
                 }, (err) => console.log(`Error fetching ${col}:`, err));
             });
         })();
+
+        // Global Menu Opener
+        window.openMenu = () => {
+            state.isMenuOpen = true;
+            renderApp();
+        };
+
+        // Global Menu Closer
+        window.closeMenu = () => {
+            state.isMenuOpen = false;
+            // renderApp is triggered by proxy setter
+        };
+
+        // Global Filter Date Opener (Safer than inline)
+        window.openFilterDate = (field) => {
+            if (!state.tempAdvFilter) {
+                state.tempAdvFilter = { ...state.advancedFilter };
+            }
+            state.tempAdvFilter.useDate = true;
+            state.pickerTarget = `TEMP_${field}`;
+            window.openAgendaModal();
+        }
+
+        window.openFormDate = () => {
+            state.pickerTarget = 'evtDate';
+            if (state.formTempDate) {
+                const parts = state.formTempDate.split('-');
+                if (parts.length === 3) {
+                    state.viewDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+                }
+            }
+            window.openAgendaModal();
+        }
     </script>
 </body>
 </html>
