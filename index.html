@@ -87,6 +87,7 @@
 </head>
 <body class="h-screen w-full flex flex-col bg-slate-100">
 
+    <!-- App Root -->
     <div id="app" class="flex-1 w-full h-full relative overflow-hidden flex flex-col">
         <div class="loading-container">
             <div class="loading-spinner"></div>
@@ -94,8 +95,10 @@
         </div>
     </div>
 
+    <!-- Modals Overlay -->
     <div id="modal-container" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm transition-opacity"></div>
 
+    <!-- Template: Login Modal -->
     <template id="login-modal-template">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in">
             <div class="p-5 border-b border-slate-100 bg-slate-50">
@@ -112,7 +115,7 @@
                 </div>
                 <div id="login-error" class="text-red-500 text-sm hidden font-medium"></div>
                 <div class="flex gap-3 pt-2">
-                    <button type="button" onclick="closeModal()" class="flex-1 py-3 rounded-lg bg-slate-100 font-bold">Cancelar</button>
+                    <button type="button" onclick="window.closeModal()" class="flex-1 py-3 rounded-lg bg-slate-100 font-bold">Cancelar</button>
                     <button type="submit" class="flex-1 py-3 rounded-lg bg-navy text-white font-bold">Entrar</button>
                 </div>
             </form>
@@ -120,7 +123,11 @@
     </template>
 
     <script>
-        // --- FIREBASE CONFIGURATION & INIT ---
+        /**
+         * ==========================================
+         * 1. FIREBASE CONFIGURATION & INITIALIZATION
+         * ==========================================
+         */
         const firebaseConfig = { 
             apiKey: "AIzaSyCmceNv1eBJLj7aWMcR7crvSVxonuzDVQo", 
             authDomain: "agendaadmvalente.firebaseapp.com", 
@@ -132,13 +139,14 @@
 
         const ADMIN_UID = "kRzVsk2nqNTyj79Lk4h6Fmhk7JP2";
 
-        // Inicializa o Firebase
+        // Inicializa o Firebase se ainda não existir
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        // Ativar persistência offline
         async function initPersistence() {
             try {
                 await db.enablePersistence();
@@ -148,20 +156,27 @@
             }
         }
 
-        // --- STATE MANAGEMENT ---
+        /**
+         * ==========================================
+         * 2. STATE MANAGEMENT & UTILS
+         * ==========================================
+         */
+        
+        const defaultAdvancedFilter = {
+            active: false,
+            useStatus: false, statusVal: 'active',
+            useGroupType: false, selectedRadio: 'type', valType: '', valSigla: '',
+            useLoc: false, valLoc: '',
+            useAtt: false, valAtt: '',
+            useDate: false, dateStart: '', dateEnd: ''
+        };
+
         const INITIAL_STATE = {
             user: null, isAdmin: false, currentScreen: 'home',
             events: [], types: [], locations: [], attendants: [],
             isMenuOpen: false, editingEventId: null, isViewAll: false,
             searchTerm: '', filterStartDate: '', filterEndDate: '',
-            advancedFilter: { 
-                active: false, 
-                useStatus: false, statusVal: 'active', 
-                useGroupType: false, selectedRadio: 'type', valType: '', valSigla: '', 
-                useLoc: false, valLoc: '', 
-                useAtt: false, valAtt: '', 
-                useDate: false, dateStart: '', dateEnd: '' 
-            },
+            advancedFilter: defaultAdvancedFilter,
             tempAdvFilter: null, pickerTarget: null, timePickerTarget: null, selectedDate: null, viewDate: new Date(),
             editingRowId: null, isCreatingRow: false, tempName: '', tempSigla: '', managerSearchTerm: '',
             formTempDate: '', formTempTime: ''
@@ -171,13 +186,14 @@
         const state = new Proxy(INITIAL_STATE, {
             set(target, property, value) {
                 target[property] = value;
-                // Evita re-renderizar a app inteira se for apenas input de texto temporário
+                
+                // Otimização: Evita re-renderizar a app inteira se for apenas input de texto temporário
                 if (typeof property === 'string') {
                     if (!['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm', 'formTempDate', 'formTempTime'].includes(property)) { 
                         renderApp(); 
                     } else { 
+                        // Lógica específica para inputs que precisam de feedback visual ou filtragem em tempo real
                         if (property === 'searchTerm') { 
-                             // Ao pesquisar, apenas limpamos filtros conflitantes no objeto target
                             if (value) {
                                 target.advancedFilter.active = false;
                                 target.isViewAll = false;
@@ -194,24 +210,25 @@
                 return true;
             }
         });
+        // Disponibiliza state globalmente
         window.state = state;
 
-        // --- UTILS ---
+        // Funções Utilitárias
         function formatDate(dateStr) { if (!dateStr) return ''; const parts = dateStr.split('-'); if (parts.length !== 3) return dateStr; return `${parts[2]}/${parts[1]}/${parts[0].slice(2)}`; }
         function formatDateFull(dateStr) { if (!dateStr) return ''; const parts = dateStr.split('-'); if (parts.length !== 3) return dateStr; return `${parts[2]}/${parts[1]}/${parts[0]}`; }
         function isEventPast(date, time) { return new Date(`${date}T${time}`) < new Date(); }
-        
-        function normalizeStr(str) {
-            if (!str) return "";
-            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        }
-
+        function normalizeStr(str) { if (!str) return ""; return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
         window.renderIcons = () => { if(window.lucide) window.lucide.createIcons(); }
 
-        // --- RENDERIZADORES ---
-        
-        // Main Router
+        /**
+         * ==========================================
+         * 3. RENDERERS (VIEWS)
+         * ==========================================
+         */
+
+        // Router Principal
         function renderApp() {
+            // Evita re-render se um modal estiver aberto (exceto menu)
             if (document.getElementById('calendar-modal-content')) return; 
             if (document.getElementById('advanced-filter-modal')) return;
             
@@ -227,7 +244,7 @@
         };
         window.renderApp = renderApp;
 
-        // Home Screen
+        // --- HOME SCREEN ---
         function renderHome() {
             const appElement = document.getElementById('app'); 
             let container = document.getElementById('home-container');
@@ -254,14 +271,14 @@
                             <div class="relative">
                                 <div class="flex justify-between items-center mb-3">
                                     <div class="flex gap-2">
-                                        <button onclick="startOpenAgenda()" class="flex items-center gap-1 px-3 py-1.5 bg-navy text-white text-xs font-bold rounded shadow hover:bg-navy-dark">
+                                        <button onclick="window.startOpenAgenda()" class="flex items-center gap-1 px-3 py-1.5 bg-navy text-white text-xs font-bold rounded shadow hover:bg-navy-dark">
                                             <i data-lucide="calendar" class="w-3 h-3"></i> Agenda
                                         </button>
-                                        <button onclick="resetAllFilters()" class="flex items-center gap-1 px-3 py-1.5 bg-navy text-white text-xs font-bold rounded shadow hover:bg-navy-dark">
+                                        <button onclick="window.resetAllFilters()" class="flex items-center gap-1 px-3 py-1.5 bg-navy text-white text-xs font-bold rounded shadow hover:bg-navy-dark">
                                             <i data-lucide="list" class="w-3 h-3"></i> Ver Todos
                                         </button>
                                     </div>
-                                    <button onclick="openPDFPreview()" class="flex items-center gap-1 px-3 py-1.5 bg-navy text-white text-xs font-bold rounded shadow hover:bg-navy-dark">
+                                    <button onclick="window.openPDFPreview()" class="flex items-center gap-1 px-3 py-1.5 bg-navy text-white text-xs font-bold rounded shadow hover:bg-navy-dark">
                                         <i data-lucide="file-text" class="w-3 h-3"></i> Exportar
                                     </button>
                                 </div>
@@ -271,7 +288,7 @@
                                         <input id="homeSearch" type="text" placeholder="Pesq. eventos, sigla, cidade, atendente" class="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-navy/20 shadow-sm">
                                         <i data-lucide="search" class="absolute left-3 top-2.5 text-slate-400 w-4 h-4"></i>
                                     </div>
-                                    <button onclick="openAdvancedFilterModal()" class="p-2 bg-white border border-slate-300 rounded-lg shadow-sm text-navy hover:bg-slate-50">
+                                    <button onclick="window.openAdvancedFilterModal()" class="p-2 bg-white border border-slate-300 rounded-lg shadow-sm text-navy hover:bg-slate-50">
                                         <i data-lucide="zoom-in" class="w-4 h-4"></i>
                                     </button>
                                 </div>
@@ -290,7 +307,6 @@
                 const searchInput = document.getElementById('homeSearch');
                 if (searchInput) {
                     searchInput.addEventListener('input', (e) => { 
-                         // Apenas atualiza o state. O Proxy chama updateHomeList.
                         state.searchTerm = e.target.value; 
                     });
                 }
@@ -303,7 +319,7 @@
             if(navPlaceholder) navPlaceholder.innerHTML = renderNavMenu();
             
             const fabContainer = document.getElementById('fab-container'); 
-            if(fabContainer) fabContainer.innerHTML = state.isAdmin ? `<button onclick="startCreateEvent()" class="fixed bottom-6 right-6 w-14 h-14 bg-orange-custom text-white rounded-full shadow-xl shadow-orange-500/30 flex items-center justify-center hover:bg-orange-dark active:scale-90 transition-all z-50 border border-white/20"><i data-lucide="plus" class="w-7 h-7"></i></button>` : '';
+            if(fabContainer) fabContainer.innerHTML = state.isAdmin ? `<button onclick="window.startCreateEvent()" class="fixed bottom-6 right-6 w-14 h-14 bg-orange-custom text-white rounded-full shadow-xl shadow-orange-500/30 flex items-center justify-center hover:bg-orange-dark active:scale-90 transition-all z-50 border border-white/20"><i data-lucide="plus" class="w-7 h-7"></i></button>` : '';
             
             window.updateHomeList();
         }
@@ -329,7 +345,7 @@
                                     const att = state.attendants.find((a) => a.id === e.attendantId); 
                                     const isPast = isEventPast(e.date, e.time); 
                                     return `
-                                        <li onclick="${state.isAdmin ? `openEditEvent('${e.id}')` : ''}" class="p-3 border-b border-slate-200/50 last:border-0 ${state.isAdmin ? 'cursor-pointer hover:bg-slate-100' : ''} ${isPast ? 'bg-slate-50 opacity-75 grayscale-[0.5]' : ''}">
+                                        <li onclick="${state.isAdmin ? `window.openEditEvent('${e.id}')` : ''}" class="p-3 border-b border-slate-200/50 last:border-0 ${state.isAdmin ? 'cursor-pointer hover:bg-slate-100' : ''} ${isPast ? 'bg-slate-50 opacity-75 grayscale-[0.5]' : ''}">
                                             <div class="flex items-start gap-3">
                                                 <div class="w-12 h-12 rounded-xl border flex items-center justify-center flex-shrink-0 ${isPast ? 'bg-slate-100 text-slate-400' : 'bg-blue-50 text-navy border-blue-100'}">
                                                     <i data-lucide="${isPast ? 'check-circle-2' : 'calendar-clock'}" class="w-6 h-6"></i>
@@ -359,78 +375,7 @@
             window.renderIcons();
         }
 
-        // Generic Manager (Types, Locs, Attendants)
-        function renderGenericManager(title, collectionKey, nameLabel, hasSigla) { 
-            const appElement = document.getElementById('app'); 
-            if(appElement) {
-                const colList = (state[collectionKey] || []).sort((a, b) => a.name.localeCompare(b.name));
-                
-                let iconName = 'folder';
-                if (collectionKey === 'types') iconName = 'tag';
-                if (collectionKey === 'locations') iconName = 'map-pin';
-                if (collectionKey === 'attendants') iconName = 'user';
-
-                appElement.innerHTML = `
-                    <div class="flex flex-col h-screen bg-slate-100">
-                        <div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10 flex-shrink-0">
-                            <button onclick="navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button>
-                            <h1 class="font-bold uppercase tracking-wide">${title}</h1>
-                        </div>
-                        <div class="p-4 flex-1 overflow-hidden flex flex-col gap-4 max-w-xl mx-auto w-full">
-                            <div class="relative shrink-0">
-                                <input id="managerSearch" type="text" placeholder="Buscar..." class="w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-navy/20" value="${state.managerSearchTerm}" oninput="state.managerSearchTerm = this.value">
-                                <i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
-                            </div>
-                            
-                            ${state.isCreatingRow ? renderInlineRow(null, nameLabel, hasSigla, true) : ''}
-                            
-                            <div class="flex-1 overflow-y-auto border border-slate-200 bg-slate-50 rounded-xl shadow-md min-h-0">
-                                <ul class="divide-y divide-slate-200/50">
-                                    ${colList.filter((i)=>i.name.toLowerCase().includes(state.managerSearchTerm.toLowerCase())).map((i) => {
-                                        if (state.editingRowId === i.id) {
-                                            return `<li class="p-3 bg-blue-50/50">${renderInlineRow(i, nameLabel, hasSigla, false)}</li>`;
-                                        }
-                                        return `
-                                            <li class="p-3 border-b border-slate-200/50 last:border-0 bg-white hover:bg-slate-50 transition-colors">
-                                                <div class="flex items-center gap-3">
-                                                    <div class="w-10 h-10 rounded-full bg-blue-50 text-navy flex items-center justify-center border border-blue-100 shrink-0">
-                                                        <i data-lucide="${iconName}" class="w-5 h-5"></i>
-                                                    </div>
-                                                    <div class="flex-1 min-w-0">
-                                                        <div class="flex items-center justify-between">
-                                                            <span class="font-bold text-navy text-sm sm:text-base truncate">${i.name}</span>
-                                                            ${hasSigla && i.sigla ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 ml-2 border border-slate-300">${i.sigla}</span>` : ''}
-                                                        </div>
-                                                    </div>
-                                                    ${state.isAdmin ? `
-                                                    <div class="flex gap-1 shrink-0">
-                                                        <button onclick="startEditRow('${i.id}')" class="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-                                                        <button onclick="requestDeleteRow('${i.id}', '${collectionKey}', '${nameLabel}')" class="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                                    </div>` : ''}
-                                                </div>
-                                            </li>
-                                        `;
-                                    }).join('')}
-                                </ul>
-                                ${colList.length === 0 ? `<div class="p-8 text-center text-slate-400 italic">Nenhum registro encontrado.</div>` : ''}
-                            </div>
-
-                            ${state.isAdmin && !state.isCreatingRow ? `
-                            <button onclick="startCreateRow()" class="w-full py-3 bg-navy text-white rounded-lg font-bold shadow-lg shadow-blue-900/20 hover:bg-navy-dark flex items-center justify-center gap-2 shrink-0 transition-colors">
-                                <i data-lucide="plus" class="w-4 h-4"></i> Adicionar
-                            </button>` : ''}
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        // Inline Row Editor
-        function renderInlineRow(item, lbl, sigla, isNew) { 
-            return `<div class="bg-blue-50 p-4 rounded-xl border-2 border-blue-200 animate-in fade-in slide-in-from-top-2 shadow-lg"><div class="mb-2"><label class="text-xs font-bold text-navy uppercase block mb-1">${lbl}</label><input id="editNameInput" class="w-full p-2 border border-blue-300 rounded bg-white focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Nome" value="${isNew ? window.state.tempName : (window.state.tempName || item.name)}" oninput="window.state.tempName=this.value"></div>${sigla ? `<div class="mb-3"><label class="text-xs font-bold text-navy uppercase block mb-1">Sigla</label><input class="w-full p-2 border border-blue-300 rounded bg-white uppercase focus:ring-2 focus:ring-blue-200 outline-none" placeholder="SIGLA" maxlength="5" value="${isNew ? window.state.tempSigla : (window.state.tempSigla || item.sigla)}" oninput="window.state.tempSigla=this.value.toUpperCase()"></div>` : ''}<div class="flex gap-2"><button onclick="window.saveGenericRow('${isNew?'':item.id}', '${sigla}')" class="flex-1 bg-green-600 text-white py-2 rounded font-bold shadow-sm hover:bg-green-700">Salvar</button><button onclick="window.cancelGenericEdit()" class="flex-1 bg-red-400 text-white py-2 rounded font-bold shadow-sm hover:bg-red-500">Cancelar</button></div></div>`; 
-        }
-
-        // Event Form
+        // --- EVENT FORM SCREEN ---
         function renderEventForm() {
             const appElement = document.getElementById('app'); 
             if (!appElement) return;
@@ -439,7 +384,6 @@
             const isEditing = !!window.state.editingEventId; 
             const event = isEditing ? window.state.events.find(e => e.id === window.state.editingEventId) : null;
             
-            // Se estiver editando mas não achou o evento (erro de estado), volta pra home
             if (isEditing && !event) {
                 window.navigateTo('home');
                 return;
@@ -454,7 +398,6 @@
             const dateDisplay = dateVal ? formatDateFull(dateVal) : 'dd/mm/aa';
             const timeDisplay = timeVal || '00:00';
 
-            // Sort Dropdowns Alphabetically
             const sortedLocations = [...window.state.locations].sort((a, b) => a.name.localeCompare(b.name));
             const sortedTypes = [...window.state.types].sort((a, b) => a.name.localeCompare(b.name));
             const sortedAttendants = [...window.state.attendants].sort((a, b) => a.name.localeCompare(b.name));
@@ -464,7 +407,7 @@
             div.id = "event-form-container";
             div.innerHTML = `
                 <div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10">
-                    <button onclick="navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button>
+                    <button onclick="window.navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button>
                     <h1 class="font-bold uppercase tracking-wide">${isEditing ? 'Editar' : 'Novo'} Evento</h1>
                 </div>
                 <div class="p-4 flex flex-col gap-4 max-w-xl mx-auto w-full overflow-y-auto">
@@ -515,17 +458,94 @@
             window.renderIcons();
         }
 
+        // --- GENERIC MANAGER SCREEN (Types, Locs, Attendants) ---
+        function renderGenericManager(title, collectionKey, nameLabel, hasSigla) { 
+            const appElement = document.getElementById('app'); 
+            if(appElement) {
+                const colList = (state[collectionKey] || []).sort((a, b) => a.name.localeCompare(b.name));
+                
+                let iconName = 'folder';
+                if (collectionKey === 'types') iconName = 'tag';
+                if (collectionKey === 'locations') iconName = 'map-pin';
+                if (collectionKey === 'attendants') iconName = 'user';
+
+                appElement.innerHTML = `
+                    <div class="flex flex-col h-screen bg-slate-100">
+                        <div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10 flex-shrink-0">
+                            <button onclick="window.navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button>
+                            <h1 class="font-bold uppercase tracking-wide">${title}</h1>
+                        </div>
+                        <div class="p-4 flex-1 overflow-hidden flex flex-col gap-4 max-w-xl mx-auto w-full">
+                            <div class="relative shrink-0">
+                                <input id="managerSearch" type="text" placeholder="Buscar..." class="w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-navy/20" value="${state.managerSearchTerm}" oninput="state.managerSearchTerm = this.value">
+                                <i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
+                            </div>
+                            
+                            ${state.isCreatingRow ? renderInlineRow(null, nameLabel, hasSigla, true) : ''}
+                            
+                            <div class="flex-1 overflow-y-auto border border-slate-200 bg-slate-50 rounded-xl shadow-md min-h-0">
+                                <ul class="divide-y divide-slate-200/50">
+                                    ${colList.filter((i)=>i.name.toLowerCase().includes(state.managerSearchTerm.toLowerCase())).map((i) => {
+                                        if (state.editingRowId === i.id) {
+                                            return `<li class="p-3 bg-blue-50/50">${renderInlineRow(i, nameLabel, hasSigla, false)}</li>`;
+                                        }
+                                        return `
+                                            <li class="p-3 border-b border-slate-200/50 last:border-0 bg-white hover:bg-slate-50 transition-colors">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-10 h-10 rounded-full bg-blue-50 text-navy flex items-center justify-center border border-blue-100 shrink-0">
+                                                        <i data-lucide="${iconName}" class="w-5 h-5"></i>
+                                                    </div>
+                                                    <div class="flex-1 min-w-0">
+                                                        <div class="flex items-center justify-between">
+                                                            <span class="font-bold text-navy text-sm sm:text-base truncate">${i.name}</span>
+                                                            ${hasSigla && i.sigla ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 ml-2 border border-slate-300">${i.sigla}</span>` : ''}
+                                                        </div>
+                                                    </div>
+                                                    ${state.isAdmin ? `
+                                                    <div class="flex gap-1 shrink-0">
+                                                        <button onclick="window.startEditRow('${i.id}')" class="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                                                        <button onclick="window.requestDeleteRow('${i.id}', '${collectionKey}', '${nameLabel}')" class="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                                    </div>` : ''}
+                                                </div>
+                                            </li>
+                                        `;
+                                    }).join('')}
+                                </ul>
+                                ${colList.length === 0 ? `<div class="p-8 text-center text-slate-400 italic">Nenhum registro encontrado.</div>` : ''}
+                            </div>
+
+                            ${state.isAdmin && !state.isCreatingRow ? `
+                            <button onclick="window.startCreateRow()" class="w-full py-3 bg-navy text-white rounded-lg font-bold shadow-lg shadow-blue-900/20 hover:bg-navy-dark flex items-center justify-center gap-2 shrink-0 transition-colors">
+                                <i data-lucide="plus" class="w-4 h-4"></i> Adicionar
+                            </button>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // --- HELPER COMPONENT: INLINE ROW EDIT ---
+        function renderInlineRow(item, lbl, sigla, isNew) { 
+            return `<div class="bg-blue-50 p-4 rounded-xl border-2 border-blue-200 animate-in fade-in slide-in-from-top-2 shadow-lg"><div class="mb-2"><label class="text-xs font-bold text-navy uppercase block mb-1">${lbl}</label><input id="editNameInput" class="w-full p-2 border border-blue-300 rounded bg-white focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Nome" value="${isNew ? window.state.tempName : (window.state.tempName || item.name)}" oninput="window.state.tempName=this.value"></div>${sigla ? `<div class="mb-3"><label class="text-xs font-bold text-navy uppercase block mb-1">Sigla</label><input class="w-full p-2 border border-blue-300 rounded bg-white uppercase focus:ring-2 focus:ring-blue-200 outline-none" placeholder="SIGLA" maxlength="5" value="${isNew ? window.state.tempSigla : (window.state.tempSigla || item.sigla)}" oninput="window.state.tempSigla=this.value.toUpperCase()"></div>` : ''}<div class="flex gap-2"><button onclick="window.saveGenericRow('${isNew?'':item.id}', '${sigla}')" class="flex-1 bg-green-600 text-white py-2 rounded font-bold shadow-sm hover:bg-green-700">Salvar</button><button onclick="window.cancelGenericEdit()" class="flex-1 bg-red-400 text-white py-2 rounded font-bold shadow-sm hover:bg-red-500">Cancelar</button></div></div>`; 
+        }
+
+        // --- SIDE MENU ---
         function renderNavMenu() { 
             if (!state.isMenuOpen) return ''; 
-            return `<div class="fixed inset-0 z-50 transition-opacity duration-300"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="window.closeMenu()"></div><div class="relative w-72 h-full bg-navy text-white flex flex-col shadow-2xl slide-in"><div class="p-6 border-b border-white/10 flex justify-between bg-[#002855]"><h2 class="text-xl font-bold">Menu</h2><button onclick="window.closeMenu()" class="hover:text-orange-custom"><i data-lucide="x"></i></button></div><nav class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">${[{id: 'home', icon: 'calendar', label: 'Tela Inicial'}, {id: 'types', icon: 'tag', label: 'Tipos de Eventos'}, {id: 'locations', icon: 'map-pin', label: 'Localidades'}, {id: 'attendants', icon: 'users', label: 'Atendentes'}, {id: 'about', icon: 'info', label: 'Sobre'}].map(i => `<button onclick="navigateTo('${i.id}')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 gap-3 border-l-4 border-transparent hover:border-orange-custom"><i data-lucide="${i.icon}" class="text-orange-custom"></i><span class="font-medium">${i.label}</span></button>`).join('')}</nav><div class="p-4 border-t border-white/10 bg-[#002244]">${state.user ? `<div class="text-xs text-slate-400 mb-2 truncate">${state.user.email}</div><button onclick="handleLogout()" class="w-full flex justify-center gap-2 px-4 py-3 bg-red-600/20 hover:bg-red-600/40 text-red-200 rounded-lg font-bold"><i data-lucide="log-out" class="w-4 h-4"></i> Sair</button>` : `<button onclick="showLoginModal()" class="w-full flex justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg font-bold"><i data-lucide="lock" class="w-4 h-4"></i> Login</button>`}</div></div></div>`; 
+            return `<div class="fixed inset-0 z-50 transition-opacity duration-300"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="window.closeMenu()"></div><div class="relative w-72 h-full bg-navy text-white flex flex-col shadow-2xl slide-in"><div class="p-6 border-b border-white/10 flex justify-between bg-[#002855]"><h2 class="text-xl font-bold">Menu</h2><button onclick="window.closeMenu()" class="hover:text-orange-custom"><i data-lucide="x"></i></button></div><nav class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">${[{id: 'home', icon: 'calendar', label: 'Tela Inicial'}, {id: 'types', icon: 'tag', label: 'Tipos de Eventos'}, {id: 'locations', icon: 'map-pin', label: 'Localidades'}, {id: 'attendants', icon: 'users', label: 'Atendentes'}, {id: 'about', icon: 'info', label: 'Sobre'}].map(i => `<button onclick="window.navigateTo('${i.id}')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 gap-3 border-l-4 border-transparent hover:border-orange-custom"><i data-lucide="${i.icon}" class="text-orange-custom"></i><span class="font-medium">${i.label}</span></button>`).join('')}</nav><div class="p-4 border-t border-white/10 bg-[#002244]">${state.user ? `<div class="text-xs text-slate-400 mb-2 truncate">${state.user.email}</div><button onclick="window.handleLogout()" class="w-full flex justify-center gap-2 px-4 py-3 bg-red-600/20 hover:bg-red-600/40 text-red-200 rounded-lg font-bold"><i data-lucide="log-out" class="w-4 h-4"></i> Sair</button>` : `<button onclick="window.showLoginModal()" class="w-full flex justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg font-bold"><i data-lucide="lock" class="w-4 h-4"></i> Login</button>`}</div></div></div>`; 
         }
 
+        // --- ABOUT SCREEN ---
         function renderAbout() { 
             const app = document.getElementById('app'); 
-            if(app) app.innerHTML = `<div class="flex flex-col h-screen bg-slate-100"><div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10"><button onclick="navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button><h1 class="font-bold uppercase tracking-wide">SOBRE</h1></div><div class="p-6 flex flex-col gap-6 text-center text-slate-600 max-w-md mx-auto"><div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-2 text-navy shadow-md"><i data-lucide="calendar-check-2" class="w-12 h-12"></i></div><div><h2 class="text-2xl font-bold text-navy mb-4">Adm Valente</h2><p class="mb-4 leading-relaxed text-slate-700">Este aplicativo foi desenvolvido para otimizar a gestão de eventos, permitindo cadastro rápido de eventos, controle por tipo, localidade e atendente, além de filtros avançados e geração de relatórios.</p><div class="mt-8"><div class="text-sm font-bold text-navy">Desenvolvido por:</div><div class="text-base font-medium">Marcos de Lima</div><div class="text-xs text-slate-400 mt-2">Versão 1.1.0</div></div></div></div></div>`; 
+            if(app) app.innerHTML = `<div class="flex flex-col h-screen bg-slate-100"><div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10"><button onclick="window.navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button><h1 class="font-bold uppercase tracking-wide">SOBRE</h1></div><div class="p-6 flex flex-col gap-6 text-center text-slate-600 max-w-md mx-auto"><div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-2 text-navy shadow-md"><i data-lucide="calendar-check-2" class="w-12 h-12"></i></div><div><h2 class="text-2xl font-bold text-navy mb-4">Adm Valente</h2><p class="mb-4 leading-relaxed text-slate-700">Este aplicativo foi desenvolvido para otimizar a gestão de eventos, permitindo cadastro rápido de eventos, controle por tipo, localidade e atendente, além de filtros avançados e geração de relatórios.</p><div class="mt-8"><div class="text-sm font-bold text-navy">Desenvolvido por:</div><div class="text-base font-medium">Marcos de Lima</div><div class="text-xs text-slate-400 mt-2">Versão 1.1.0</div></div></div></div></div>`; 
         }
 
-        // --- GLOBAL ACTIONS ---
+        /**
+         * ==========================================
+         * 4. GLOBAL ACTIONS
+         * ==========================================
+         */
 
         window.navigateTo = (screen) => { 
             if (state.currentScreen === screen) { state.isMenuOpen = false; renderApp(); return; } 
@@ -545,7 +565,7 @@
                     <h3 class="text-lg font-bold text-navy mb-2 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-500"></i> Confirmação</h3>
                     <p class="text-slate-600 mb-6 font-medium">${text}</p>
                     <div class="flex gap-3">
-                        <button onclick="closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Não</button>
+                        <button onclick="window.closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Não</button>
                         <button id="confirm-action-btn" class="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold shadow-lg hover:bg-red-700">Sim, Excluir</button>
                     </div>
                 </div>
@@ -559,18 +579,10 @@
             }
         }
         
-        // GLOBAL MENU OPENER
-        window.openMenu = () => {
-            state.isMenuOpen = true;
-            renderApp();
-        };
+        window.openMenu = () => { state.isMenuOpen = true; renderApp(); };
+        window.closeMenu = () => { state.isMenuOpen = false; };
 
-        // GLOBAL MENU CLOSER
-        window.closeMenu = () => {
-            state.isMenuOpen = false;
-            // renderApp is triggered by proxy setter
-        };
-
+        // --- AUTH ---
         window.showLoginModal = () => { 
             window.state.isMenuOpen = false; 
             renderApp(); 
@@ -598,8 +610,7 @@
             } 
         };
 
-        // --- FILTERS & LIST HELPERS ---
-
+        // --- FILTERS ---
         function getFilteredEvents() {
             let result = [...state.events];
             
@@ -670,7 +681,7 @@
             return "Todos os Eventos";
         }
 
-        // --- AGENDA & MODALS ---
+        // --- AGENDA & DATE PICKER ACTIONS ---
         window.startOpenAgenda = () => { state.pickerTarget = null; state.viewDate = new Date(); window.openAgendaModal(); };
         window.resetAllFilters = () => { state.searchTerm = ''; state.selectedDate = null; state.filterStartDate = ''; state.filterEndDate = ''; state.advancedFilter.active = false; state.isViewAll = true; renderApp(); };
         window.startCreateEvent = () => { if (!state.isAdmin) return; state.editingEventId = null; state.formTempDate = new Date().toISOString().split('T')[0]; state.formTempTime = '08:00'; window.navigateTo('event-form'); };
@@ -689,13 +700,13 @@
                     dotsHtml = eventsOnDay.slice(0, 4).map(() => `<span class="w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-orange-custom' : 'bg-navy'}"></span>`).join('');
                     if (eventsOnDay.length > 4) dotsHtml += `<span class="text-[8px] leading-none ${isSelected ? 'text-orange-custom' : 'text-navy'}">+</span>`;
                 }
-                calendarHtml += `<button onclick="toggleDateSelection('${dateStr}')" class="aspect-square flex flex-col items-center justify-start pt-1.5 rounded-lg border ${isSelected ? 'bg-navy text-white shadow-md border-navy scale-105 z-10' : 'hover:bg-slate-200/60 border-transparent'} ${isToday && !isSelected ? 'bg-blue-50/50 font-bold border-blue-200' : ''}"><span class="text-xs sm:text-sm leading-none mb-1">${day}</span><div class="flex gap-0.5 justify-center flex-wrap px-0.5 w-full">${dotsHtml}</div></button>`;
+                calendarHtml += `<button onclick="window.toggleDateSelection('${dateStr}')" class="aspect-square flex flex-col items-center justify-start pt-1.5 rounded-lg border ${isSelected ? 'bg-navy text-white shadow-md border-navy scale-105 z-10' : 'hover:bg-slate-200/60 border-transparent'} ${isToday && !isSelected ? 'bg-blue-50/50 font-bold border-blue-200' : ''}"><span class="text-xs sm:text-sm leading-none mb-1">${day}</span><div class="flex gap-0.5 justify-center flex-wrap px-0.5 w-full">${dotsHtml}</div></button>`;
             }
             let title = 'Agenda'; if (state.pickerTarget) title = 'Selecione a Data';
             
             const dayEvents = state.events.filter(e => e.date === state.selectedDate).sort((a, b) => a.time.localeCompare(b.time));
 
-            window.showModal(`<div id="calendar-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-4 flex flex-col max-h-[90vh]"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5"></i> ${title}</h3><button onclick="closeModal()" class="text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button></div><div><div class="flex justify-between items-center mb-4 gap-2 bg-slate-50 p-2 rounded-lg"><button onclick="changeMonth(-1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-left" class="w-5 h-5"></i></button><div class="flex gap-2 items-center flex-1 justify-center"><select onchange="changeViewDate()" id="monthSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${monthNames.map((m, i) => `<option value="${i}" ${i === state.viewDate.getMonth() ? 'selected' : ''}>${m}</option>`).join('')}</select><select onchange="changeViewDate()" id="yearSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${Array.from({length: 10}, (_, i) => new Date().getFullYear() - 5 + i).map(y => `<option value="${y}" ${y === state.viewDate.getFullYear() ? 'selected' : ''}>${y}</option>`).join('')}</select></div><button onclick="changeMonth(1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-right" class="w-5 h-5"></i></button></div><div class="grid grid-cols-7 gap-1 text-center text-xs font-black text-slate-400 mb-2"><div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div></div><div class="grid grid-cols-7 gap-1 sm:gap-2 mb-2">${calendarHtml}</div></div>${!state.pickerTarget && state.selectedDate ? `<div class="border-t pt-3 mt-2 flex-1 min-h-0 flex flex-col"><div class="text-xs font-bold text-slate-500 uppercase mb-2">Eventos: ${formatDate(state.selectedDate)}</div><div class="flex flex-col gap-1 overflow-y-auto max-h-[180px] pr-1">${dayEvents.map(e => { const type = state.types.find(t => t.id === e.typeId); const sigla = type?.sigla ? ` <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 ml-1">${type.sigla}</span>` : ''; return `<div class="bg-slate-50 border border-slate-200 p-2 rounded flex items-center gap-2 text-xs"><span class="font-bold text-navy whitespace-nowrap">${e.time}</span><span class="truncate font-medium text-slate-700 flex-1 flex items-center">${type?.name || 'Evento'}${sigla}</span></div>`; }).join('') || '<div class="text-center text-slate-400 text-xs italic">Nada agendado.</div>'}</div></div>` : ''}${!state.pickerTarget ? `<div class="mt-4 pt-3 border-t"><button onclick="closeModal(); renderApp()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-navy-dark transition-colors"><i data-lucide="list" class="w-4 h-4"></i> Ver Lista</button></div>` : ''}</div>`);
+            window.showModal(`<div id="calendar-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-4 flex flex-col max-h-[90vh]"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5"></i> ${title}</h3><button onclick="window.closeModal()" class="text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button></div><div><div class="flex justify-between items-center mb-4 gap-2 bg-slate-50 p-2 rounded-lg"><button onclick="window.changeMonth(-1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-left" class="w-5 h-5"></i></button><div class="flex gap-2 items-center flex-1 justify-center"><select onchange="window.changeViewDate()" id="monthSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${monthNames.map((m, i) => `<option value="${i}" ${i === state.viewDate.getMonth() ? 'selected' : ''}>${m}</option>`).join('')}</select><select onchange="window.changeViewDate()" id="yearSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${Array.from({length: 10}, (_, i) => new Date().getFullYear() - 5 + i).map(y => `<option value="${y}" ${y === state.viewDate.getFullYear() ? 'selected' : ''}>${y}</option>`).join('')}</select></div><button onclick="window.changeMonth(1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-right" class="w-5 h-5"></i></button></div><div class="grid grid-cols-7 gap-1 text-center text-xs font-black text-slate-400 mb-2"><div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div></div><div class="grid grid-cols-7 gap-1 sm:gap-2 mb-2">${calendarHtml}</div></div>${!state.pickerTarget && state.selectedDate ? `<div class="border-t pt-3 mt-2 flex-1 min-h-0 flex flex-col"><div class="text-xs font-bold text-slate-500 uppercase mb-2">Eventos: ${formatDate(state.selectedDate)}</div><div class="flex flex-col gap-1 overflow-y-auto max-h-[180px] pr-1">${dayEvents.map(e => { const type = state.types.find(t => t.id === e.typeId); const sigla = type?.sigla ? ` <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 ml-1">${type.sigla}</span>` : ''; return `<div class="bg-slate-50 border border-slate-200 p-2 rounded flex items-center gap-2 text-xs"><span class="font-bold text-navy whitespace-nowrap">${e.time}</span><span class="truncate font-medium text-slate-700 flex-1 flex items-center">${type?.name || 'Evento'}${sigla}</span></div>`; }).join('') || '<div class="text-center text-slate-400 text-xs italic">Nada agendado.</div>'}</div></div>` : ''}${!state.pickerTarget ? `<div class="mt-4 pt-3 border-t"><button onclick="window.closeModal(); renderApp()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-navy-dark transition-colors"><i data-lucide="list" class="w-4 h-4"></i> Ver Lista</button></div>` : ''}</div>`);
         };
 
         window.toggleDateSelection = (d) => { 
@@ -732,12 +743,12 @@
         window.changeMonth = (d) => { state.viewDate = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() + d, 1); state.selectedDate = null; if(document.getElementById('calendar-modal-content')) window.openAgendaModal(); else renderApp(); };
         window.changeViewDate = () => { state.viewDate = new Date(parseInt(document.getElementById('yearSelect').value), parseInt(document.getElementById('monthSelect').value), 1); state.selectedDate = null; if(document.getElementById('calendar-modal-content')) window.openAgendaModal(); else renderApp(); };
 
-        // Time Picker
+        // --- TIME PICKER ---
         window.openTimePickerModal = (target) => {
             state.timePickerTarget = target;
             const hours = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'));
             const minutes = Array.from({length: 12}, (_, i) => String(i * 5).padStart(2, '0')); 
-            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-4 flex flex-col"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5"></i> Selecione a Hora</h3><button onclick="closeModal()" class="text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button></div><div class="flex gap-4 h-64"><div class="flex-1 flex flex-col border border-slate-200 rounded overflow-hidden"><div class="bg-slate-100 text-xs font-bold text-center py-1 uppercase text-slate-500">Horas</div><div class="overflow-y-auto flex-1 bg-white p-1 gap-1 grid grid-cols-1 content-start">${hours.map(h => `<button onclick="tempSelectTime('${h}', null)" class="py-2 hover:bg-orange-custom/20 hover:text-navy rounded text-sm font-bold text-slate-600 time-h-btn" data-h="${h}">${h}</button>`).join('')}</div></div><div class="flex-1 flex flex-col border border-slate-200 rounded overflow-hidden"><div class="bg-slate-100 text-xs font-bold text-center py-1 uppercase text-slate-500">Minutos</div><div class="overflow-y-auto flex-1 bg-white p-1 gap-1 grid grid-cols-1 content-start">${minutes.map(m => `<button onclick="tempSelectTime(null, '${m}')" class="py-2 hover:bg-orange-custom/20 hover:text-navy rounded text-sm font-bold text-slate-600 time-m-btn" data-m="${m}">${m}</button>`).join('')}</div></div></div><div class="mt-4 pt-3 border-t text-center"><div id="timePreview" class="text-2xl font-black text-navy mb-3">--:--</div><button onclick="confirmTimeSelection()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold">Confirmar</button></div></div>`);
+            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-4 flex flex-col"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5"></i> Selecione a Hora</h3><button onclick="window.closeModal()" class="text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button></div><div class="flex gap-4 h-64"><div class="flex-1 flex flex-col border border-slate-200 rounded overflow-hidden"><div class="bg-slate-100 text-xs font-bold text-center py-1 uppercase text-slate-500">Horas</div><div class="overflow-y-auto flex-1 bg-white p-1 gap-1 grid grid-cols-1 content-start">${hours.map(h => `<button onclick="window.tempSelectTime('${h}', null)" class="py-2 hover:bg-orange-custom/20 hover:text-navy rounded text-sm font-bold text-slate-600 time-h-btn" data-h="${h}">${h}</button>`).join('')}</div></div><div class="flex-1 flex flex-col border border-slate-200 rounded overflow-hidden"><div class="bg-slate-100 text-xs font-bold text-center py-1 uppercase text-slate-500">Minutos</div><div class="overflow-y-auto flex-1 bg-white p-1 gap-1 grid grid-cols-1 content-start">${minutes.map(m => `<button onclick="window.tempSelectTime(null, '${m}')" class="py-2 hover:bg-orange-custom/20 hover:text-navy rounded text-sm font-bold text-slate-600 time-m-btn" data-m="${m}">${m}</button>`).join('')}</div></div></div><div class="mt-4 pt-3 border-t text-center"><div id="timePreview" class="text-2xl font-black text-navy mb-3">--:--</div><button onclick="window.confirmTimeSelection()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold">Confirmar</button></div></div>`);
             let currentVal = '08:00'; if(state.timePickerTarget === 'evtTime' && state.formTempTime) currentVal = state.formTempTime;
             window.tempTimeH = currentVal.split(':')[0]; window.tempTimeM = currentVal.split(':')[1]; window.updateTimeUI();
         };
@@ -753,16 +764,12 @@
         }
         window.confirmTimeSelection = () => { const time = `${window.tempTimeH}:${window.tempTimeM}`; if (state.timePickerTarget === 'evtTime') { state.formTempTime = time; const display = document.getElementById('evtTimeDisplay'); if (display) display.textContent = time; } state.timePickerTarget = null; window.closeModal(); }
 
-        // Advanced Filter
+        // --- ADVANCED FILTER ---
         window.updateAdvFilterState = (field, value, clearFields = []) => {
-            // Safety check: if null, re-initialize from current active filter or defaults
             if (!state.tempAdvFilter) {
                 state.tempAdvFilter = { ...state.advancedFilter };
             }
-            
             state.tempAdvFilter[field] = value;
-            
-            // Clear dependent fields if unchecking
             if (!value && typeof value === 'boolean' && clearFields.length > 0) {
                 clearFields.forEach(f => {
                     if (f) state.tempAdvFilter[f] = '';
@@ -773,7 +780,6 @@
         window.openAdvancedFilterModal = (restore = false) => {
             const src = restore && state.tempAdvFilter ? state.tempAdvFilter : state.advancedFilter; state.tempAdvFilter = { ...src };
             
-            // Ordenação Alfabética das opções para os Dropdowns
             const sortedTypes = [...state.types].sort((a, b) => a.name.localeCompare(b.name));
             const sortedSiglas = state.types.filter(t => t.sigla).sort((a, b) => (a.sigla || '').localeCompare(b.sigla || ''));
             const sortedLocations = [...state.locations].sort((a, b) => a.name.localeCompare(b.name));
@@ -787,7 +793,7 @@
             const dateStartDisplay = src.dateStart ? formatDateFull(src.dateStart) : 'Selecione...'; 
             const dateEndDisplay = src.dateEnd ? formatDateFull(src.dateEnd) : 'Selecione...';
             
-            // Helper functions (injected as string) to handle visual toggling
+            // Funções helper para toggle visual no modal
             const toggleDiv = `(function(c, t){ 
                 const div = document.getElementById(c); 
                 if(t.checked) { 
@@ -812,23 +818,21 @@
                 }
             })`;
             
-            // Helper to update boolean state safely using window.updateAdvFilterState
             const updateBool = (prop, clearProp1 = '', clearProp2 = '') => {
                 const clears = [clearProp1, clearProp2].filter(c => c).map(c => `'${c}'`).join(',');
                 return `window.updateAdvFilterState('${prop}', this.checked, [${clears}]);`;
             }
             
-            // Helper to update string inputs safely
             const updateStr = (prop) => `window.updateAdvFilterState('${prop}', this.value); this.classList.remove('input-error');`;
 
             window.showModal(`
                 <div id="advanced-filter-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-md p-0 overflow-hidden flex flex-col max-h-[90vh]">
                     <div class="p-3 border-b border-slate-100 flex justify-between items-center bg-navy text-white">
                         <h3 class="font-bold text-base flex items-center gap-2"><i data-lucide="filter" class="w-4 h-4"></i> Informe os dados para Filtrar</h3>
-                        <button onclick="closeModal()" class="text-white/80 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        <button onclick="window.closeModal()" class="text-white/80 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
-                    
                     <div class="p-3 overflow-y-auto flex-1 flex flex-col gap-2 bg-slate-50">
+                        <!-- Filtro Status -->
                         <div class="bg-white p-2 rounded shadow-sm border border-slate-200">
                             <div class="flex items-center justify-between mb-1">
                                 <div class="flex items-center gap-2">
@@ -841,6 +845,7 @@
                                 </div>
                             </div>
                         </div>
+                        <!-- Filtro Tipo/Sigla -->
                         <div class="bg-white p-2 rounded shadow-sm border border-slate-200">
                             <div class="flex items-center gap-2 mb-2">
                                 <input type="checkbox" id="adv_useGroupType" class="w-4 h-4 rounded text-navy focus:ring-navy" ${src.useGroupType ? 'checked' : ''} onchange="${updateBool('useGroupType', 'valType', 'valSigla')} ${toggleDiv}('groupTypeContent', this)">
@@ -855,6 +860,7 @@
                                 <div id="adv_div_sigla" class="${src.selectedRadio === 'sigla' ? '' : 'hidden'}"><select id="adv_valSigla" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:border-navy outline-none" onchange="${updateStr('valSigla')}">${typeSiglaOpts}</select></div>
                             </div>
                         </div>
+                        <!-- Filtro Local e Atendente -->
                         <div class="grid grid-cols-2 gap-2">
                             <div class="bg-white p-2 rounded shadow-sm border border-slate-200">
                                 <div class="flex items-center gap-2 mb-1">
@@ -871,6 +877,7 @@
                                 <div id="adv_div_att" class="transition-opacity ${!src.useAtt ? 'opacity-50 pointer-events-none' : ''}"><select id="adv_valAtt" class="w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:border-navy outline-none" onchange="${updateStr('valAtt')}">${attOpts}</select></div>
                             </div>
                         </div>
+                        <!-- Filtro Datas -->
                         <div class="bg-white p-2 rounded shadow-sm border border-slate-200">
                             <div class="flex items-center gap-2 mb-2">
                                 <input type="checkbox" id="adv_useDate" class="w-4 h-4 rounded text-navy" ${src.useDate ? 'checked' : ''} onchange="${updateBool('useDate', 'dateStart', 'dateEnd')} ${toggleDate}('adv_div_date', this)">
@@ -882,19 +889,49 @@
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="p-3 bg-white border-t border-slate-200 flex gap-3"><button type="button" onclick="closeModal()" class="flex-1 py-2 bg-slate-100 text-slate-600 rounded font-bold hover:bg-slate-200 transition-colors text-sm">Cancelar</button><button type="button" onclick="applyAdvancedFilter()" class="flex-1 py-2 bg-navy text-white rounded font-bold shadow hover:bg-navy-dark transition-colors text-sm">Aplicar</button></div></div>`);
+                    <div class="p-3 bg-white border-t border-slate-200 flex gap-3"><button type="button" onclick="window.closeModal()" class="flex-1 py-2 bg-slate-100 text-slate-600 rounded font-bold hover:bg-slate-200 transition-colors text-sm">Cancelar</button><button type="button" onclick="window.applyAdvancedFilter()" class="flex-1 py-2 bg-navy text-white rounded font-bold shadow hover:bg-navy-dark transition-colors text-sm">Aplicar</button></div></div>`);
         };
 
+        window.applyAdvancedFilter = () => {
+            const t = state.tempAdvFilter;
+            if (!t) return;
+            
+            let isValid = true;
+            document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+
+            if (t.useGroupType) {
+                if (t.selectedRadio === 'type' && !t.valType) { document.getElementById('adv_valType')?.classList.add('input-error'); isValid = false; }
+                if (t.selectedRadio === 'sigla' && !t.valSigla) { document.getElementById('adv_valSigla')?.classList.add('input-error'); isValid = false; }
+            }
+            if (t.useLoc && !t.valLoc) { document.getElementById('adv_valLoc')?.classList.add('input-error'); isValid = false; }
+            if (t.useAtt && !t.valAtt) { document.getElementById('adv_valAtt')?.classList.add('input-error'); isValid = false; }
+            if (t.useDate) {
+                if (!t.dateStart) { document.getElementById('adv_btn_start')?.classList.add('input-error'); isValid = false; }
+                if (!t.dateEnd) { document.getElementById('adv_btn_end')?.classList.add('input-error'); isValid = false; }
+            }
+
+            if (!isValid) return;
+
+            state.advancedFilter = { ...t, active: true };
+            state.tempAdvFilter = null;
+            state.searchTerm = '';
+            state.selectedDate = null;
+            state.filterStartDate = '';
+            state.filterEndDate = '';
+            window.closeModal();
+            renderApp();
+        };
+
+        // --- PDF PREVIEW ---
         window.openPDFPreview = () => {
             const events = getFilteredEvents();
             const filterDesc = getFilterDescription();
             const generatedDate = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
             const rowsHtml = events.map((e) => {
-                const type = window.state.types.find(t => t.id === e.typeId);
-                const loc = window.state.locations.find(l => l.id === e.locationId);
-                const att = window.state.attendants.find(a => a.id === e.attendantId);
+                const type = state.types.find(t => t.id === e.typeId);
+                const loc = state.locations.find(l => l.id === e.locationId);
+                const att = state.attendants.find(a => a.id === e.attendantId);
                 return `
                     <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50 even:bg-slate-50/50">
                         <td class="p-3 text-xs sm:text-sm font-bold text-navy whitespace-nowrap">${formatDateFull(e.date)}</td>
@@ -912,7 +949,7 @@
                         <h3 class="font-bold text-lg text-navy flex items-center gap-2">
                         <i data-lucide="file-text" class="w-5 h-5"></i> Visualizar Relatório
                         </h3>
-                        <button onclick="closeModal()" class="text-slate-400 hover:text-navy"><i data-lucide="x" class="w-6 h-6"></i></button>
+                        <button onclick="window.closeModal()" class="text-slate-400 hover:text-navy"><i data-lucide="x" class="w-6 h-6"></i></button>
                     </div>
                     <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100">
                         <div class="bg-white shadow-sm border border-slate-200 p-6 rounded-lg min-h-[300px]">
@@ -946,8 +983,8 @@
                         </div>
                     </div>
                     <div class="p-4 bg-white border-t border-slate-200 flex gap-3 justify-end flex-shrink-0">
-                        <button onclick="closeModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Fechar</button>
-                        <button onclick="confirmPDFDownload()" class="px-4 py-2 bg-navy text-white rounded-lg font-bold shadow-lg hover:bg-navy-dark flex items-center gap-2">
+                        <button onclick="window.closeModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Fechar</button>
+                        <button onclick="window.confirmPDFDownload()" class="px-4 py-2 bg-navy text-white rounded-lg font-bold shadow-lg hover:bg-navy-dark flex items-center gap-2">
                             <i data-lucide="download" class="w-4 h-4"></i> Baixar PDF
                         </button>
                     </div>
@@ -967,16 +1004,10 @@
             doc.text(filterDesc, pageWidth / 2, 28, { align: 'center' }); 
             const events = getFilteredEvents();
             const tableData = events.map(e => {
-                const type = window.state.types.find(t => t.id === e.typeId);
-                const loc = window.state.locations.find(l => l.id === e.locationId);
-                const att = window.state.attendants.find(a => a.id === e.attendantId);
-                return [
-                    formatDateFull(e.date),
-                    e.time,
-                    type?.name || '-',
-                    loc?.name || '-',
-                    att?.name || '-'
-                ];
+                const type = state.types.find(t => t.id === e.typeId);
+                const loc = state.locations.find(l => l.id === e.locationId);
+                const att = state.attendants.find(a => a.id === e.attendantId);
+                return [ formatDateFull(e.date), e.time, type?.name || '-', loc?.name || '-', att?.name || '-' ];
             });
             doc.autoTable({
                 startY: 35,
@@ -991,6 +1022,7 @@
             window.closeModal();
         };
 
+        // --- ROW MANAGEMENT ---
         window.getCollectionKeyByScreen = (s) => {
             if (s === 'types') return 'types';
             if (s === 'locations') return 'locations';
@@ -1095,6 +1127,22 @@
             });
         };
         
+        window.openFilterDate = (field) => {
+            if (!state.tempAdvFilter) { state.tempAdvFilter = { ...state.advancedFilter }; }
+            state.tempAdvFilter.useDate = true;
+            state.pickerTarget = `TEMP_${field}`;
+            window.openAgendaModal();
+        }
+
+        window.openFormDate = () => {
+            state.pickerTarget = 'evtDate';
+            if (state.formTempDate) {
+                const parts = state.formTempDate.split('-');
+                if (parts.length === 3) { state.viewDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1); }
+            }
+            window.openAgendaModal();
+        }
+
         // Listener de Navegação (Botão Voltar)
         window.addEventListener('popstate', (event) => {
             const screen = event.state && event.state.screen ? event.state.screen : 'home';
@@ -1116,7 +1164,6 @@
         (async function init() {
             await initPersistence();
 
-            // Inicializa histórico
             if (!history.state) {
                 history.replaceState({ screen: 'home' }, '', '');
             }
@@ -1137,39 +1184,6 @@
                 }, (err) => console.log(`Error fetching ${col}:`, err));
             });
         })();
-
-        // Global Menu Opener
-        window.openMenu = () => {
-            state.isMenuOpen = true;
-            renderApp();
-        };
-
-        // Global Menu Closer
-        window.closeMenu = () => {
-            state.isMenuOpen = false;
-            // renderApp is triggered by proxy setter
-        };
-
-        // Global Filter Date Opener (Safer than inline)
-        window.openFilterDate = (field) => {
-            if (!state.tempAdvFilter) {
-                state.tempAdvFilter = { ...state.advancedFilter };
-            }
-            state.tempAdvFilter.useDate = true;
-            state.pickerTarget = `TEMP_${field}`;
-            window.openAgendaModal();
-        }
-
-        window.openFormDate = () => {
-            state.pickerTarget = 'evtDate';
-            if (state.formTempDate) {
-                const parts = state.formTempDate.split('-');
-                if (parts.length === 3) {
-                    state.viewDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
-                }
-            }
-            window.openAgendaModal();
-        }
     </script>
 </body>
 </html>
