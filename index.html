@@ -539,7 +539,7 @@
         // --- ABOUT SCREEN ---
         function renderAbout() { 
             const app = document.getElementById('app'); 
-            if(app) app.innerHTML = `<div class="flex flex-col h-screen bg-slate-100"><div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10"><button onclick="window.navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button><h1 class="font-bold uppercase tracking-wide">SOBRE</h1></div><div class="p-6 flex flex-col gap-6 text-center text-slate-600 max-w-md mx-auto"><div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-2 text-navy shadow-md"><i data-lucide="calendar-check-2" class="w-12 h-12"></i></div><div><h2 class="text-2xl font-bold text-navy mb-4">Adm Valente</h2><p class="mb-4 leading-relaxed text-slate-700">Este aplicativo foi desenvolvido para otimizar a gestão de eventos, permitindo cadastro rápido de eventos, controle por tipo, localidade e atendente, além de filtros avançados e geração de relatórios.</p><div class="mt-8"><div class="text-sm font-bold text-navy">Desenvolvido por:</div><div class="text-base font-medium">Marcos de Lima</div><div class="text-xs text-slate-400 mt-2">Versão 1.1.0</div></div></div></div></div>`; 
+            if(app) app.innerHTML = `<div class="flex flex-col h-screen bg-slate-100"><div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10"><button onclick="window.navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button><h1 class="font-bold uppercase tracking-wide">SOBRE</h1></div><div class="p-6 flex flex-col gap-6 text-center text-slate-600 max-w-md mx-auto"><div class="w-24 h-24 bg-navy rounded-full flex items-center justify-center mx-auto mb-2 text-white shadow-md"><i data-lucide="calendar-check-2" class="w-12 h-12"></i></div><div><h2 class="text-2xl font-bold text-navy mb-4">Adm Valente</h2><p class="mb-4 leading-relaxed text-slate-700">Este aplicativo foi desenvolvido para otimizar a gestão de eventos, permitindo cadastro rápido de eventos, controle por tipo, localidade e atendente, além de filtros avançados e geração de relatórios.</p><div class="mt-8"><div class="text-sm font-bold text-navy">Desenvolvido por:</div><div class="text-base font-medium">Marcos de Lima</div><div class="text-[10px] text-slate-400 mt-2 uppercase">Versão 1.1.0</div></div></div></div></div>`; 
         }
 
         /**
@@ -948,14 +948,14 @@
                 <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in overflow-hidden">
                     <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 flex-shrink-0">
                         <h3 class="font-bold text-lg text-navy flex items-center gap-2">
-                        <i data-lucide="file-text" class="w-5 h-5"></i> Visualizar Relatório
+                        <i data-lucide="file-text" class="w-5 h-5"></i> Visualizar Lista
                         </h3>
                         <button onclick="window.closeModal()" class="text-slate-400 hover:text-navy"><i data-lucide="x" class="w-6 h-6"></i></button>
                     </div>
                     <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100">
                         <div id="report-capture-area" class="bg-white shadow-sm border border-slate-200 p-6 rounded-lg min-h-[300px]">
                             <div class="text-center mb-6 border-b border-slate-100 pb-4">
-                                <h2 class="text-xl sm:text-2xl font-black text-navy uppercase tracking-wide mb-1">Relatório de Eventos</h2>
+                                <h2 class="text-xl sm:text-2xl font-black text-navy uppercase tracking-wide mb-1">Lista de Eventos</h2>
                                 <h3 class="text-base sm:text-lg font-medium text-slate-600">Adm Valente</h3>
                                 <p class="text-[10px] text-slate-400 mt-2">Gerado em: ${generatedDate}</p>
                                 <div class="mt-3 inline-block px-3 py-1 bg-blue-50 text-navy text-xs font-bold rounded-full border border-blue-100">
@@ -983,13 +983,17 @@
                             </div>
                         </div>
                     </div>
-                    <div class="p-4 bg-white border-t border-slate-200 flex flex-wrap gap-3 justify-end flex-shrink-0">
-                        <button onclick="window.closeModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Fechar</button>
-                        <button onclick="window.confirmPNGDownload()" class="px-4 py-2 bg-navy text-white rounded-lg font-bold shadow-lg hover:bg-navy-dark flex items-center gap-2">
-                            <i data-lucide="image" class="w-4 h-4"></i> Baixar PNG
-                        </button>
-                        <button onclick="window.confirmPDFDownload()" class="px-4 py-2 bg-navy text-white rounded-lg font-bold shadow-lg hover:bg-navy-dark flex items-center gap-2">
-                            <i data-lucide="download" class="w-4 h-4"></i> Baixar PDF
+                    <div class="p-4 bg-white border-t border-slate-200 flex flex-col gap-3 shrink-0">
+                        <div class="flex gap-3 justify-end">
+                            <button onclick="window.confirmPNGDownload()" class="flex-1 sm:flex-none px-4 py-2 bg-navy text-white rounded-lg font-bold shadow hover:bg-navy-dark flex items-center justify-center gap-2">
+                                <i data-lucide="image" class="w-4 h-4"></i> Baixar PNG
+                            </button>
+                            <button onclick="window.confirmPDFDownload()" class="flex-1 sm:flex-none px-4 py-2 bg-navy text-white rounded-lg font-bold shadow hover:bg-navy-dark flex items-center justify-center gap-2">
+                                <i data-lucide="download" class="w-4 h-4"></i> Baixar PDF
+                            </button>
+                        </div>
+                        <button onclick="window.closeModal()" class="w-full py-2.5 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200 border border-slate-200">
+                            Fechar
                         </button>
                     </div>
                 </div>
@@ -1001,7 +1005,7 @@
             const pageWidth = doc.internal.pageSize.getWidth();
             doc.setFontSize(18);
             doc.setTextColor(0, 51, 102); 
-            doc.text("Relatório de Eventos - Adm Valente", pageWidth / 2, 20, { align: 'center' }); 
+            doc.text("Lista de Eventos - Adm Valente", pageWidth / 2, 20, { align: 'center' }); 
             doc.setFontSize(10);
             doc.setTextColor(100);
             const filterDesc = getFilterDescription();
@@ -1030,9 +1034,8 @@
             const element = document.getElementById('report-capture-area');
             if (!element) return;
 
-            // Mostra um loading simples se necessário ou apenas executa
             window.html2canvas(element, {
-                scale: 2, // Melhor qualidade
+                scale: 2, 
                 useCORS: true,
                 backgroundColor: '#ffffff',
                 logging: false
