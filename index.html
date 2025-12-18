@@ -101,11 +101,11 @@
             display: flex; flex-direction: column; align-items: center;
         }
     </style>
-        <link rel="manifest" href="./manifest.json">
-        <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-        <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
-        <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
-        <meta name="theme-color" content="#003366">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
+    <meta name="theme-color" content="#003366">
 </head>
 <body class="h-screen w-full flex flex-col bg-slate-100">
 
@@ -499,13 +499,9 @@
                                 <input id="managerSearch" type="text" placeholder="Buscar..." class="w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-navy/20" value="${window.state.managerSearchTerm}" oninput="window.state.managerSearchTerm = this.value">
                                 <i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
                             </div>
-                            ${window.state.isCreatingRow ? renderInlineRow(null, nameLabel, hasSigla, true) : ''}
                             <div class="flex-1 overflow-y-auto border border-slate-200 bg-slate-50 rounded-xl shadow-md min-h-0">
                                 <ul class="divide-y divide-slate-200/50">
                                     ${colList.filter((i)=>i.name.toLowerCase().includes(window.state.managerSearchTerm.toLowerCase())).map((i) => {
-                                        if (window.state.editingRowId === i.id) {
-                                            return `<li class="p-3 bg-blue-50/50">${renderInlineRow(i, nameLabel, hasSigla, false)}</li>`;
-                                        }
                                         return `
                                             <li class="p-3 border-b border-slate-200/50 last:border-0 bg-white hover:bg-slate-50 transition-colors">
                                                 <div class="flex items-center gap-3">
@@ -530,7 +526,7 @@
                                 </ul>
                                 ${colList.length === 0 ? `<div class="p-8 text-center text-slate-400 italic">Nenhum registro encontrado.</div>` : ''}
                             </div>
-                            ${window.state.isAdmin && !window.state.isCreatingRow ? `
+                            ${window.state.isAdmin ? `
                             <button onclick="window.startCreateRow()" class="w-full py-3 bg-navy text-white rounded-lg font-bold shadow-lg shadow-blue-900/20 hover:bg-navy-dark flex items-center justify-center gap-2 shrink-0 transition-colors">
                                 <i data-lucide="plus" class="w-4 h-4"></i> Adicionar
                             </button>` : ''}
@@ -541,7 +537,7 @@
         }
 
         function renderInlineRow(item, lbl, sigla, isNew) { 
-            return `<div id="inline-edit-row" class="bg-blue-50 p-4 rounded-xl border-2 border-blue-200 animate-in fade-in slide-in-from-top-2 shadow-lg"><div class="mb-2"><label class="text-xs font-bold text-navy uppercase block mb-1">${lbl}</label><input id="editNameInput" class="w-full p-2 border border-blue-300 rounded bg-white focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Nome" value="${isNew ? window.state.tempName : (window.state.tempName || item.name)}" oninput="window.state.tempName=this.value"></div>${sigla ? `<div class="mb-3"><label class="text-xs font-bold text-navy uppercase block mb-1">Sigla</label><input class="w-full p-2 border border-blue-300 rounded bg-white uppercase focus:ring-2 focus:ring-blue-200 outline-none" placeholder="SIGLA" maxlength="5" value="${isNew ? window.state.tempSigla : (window.state.tempSigla || item.sigla)}" oninput="window.state.tempSigla=this.value.toUpperCase()"></div>` : ''}<div class="flex gap-2"><button onclick="window.saveGenericRow('${isNew?'':item.id}', '${sigla}')" class="flex-1 bg-green-600 text-white py-2 rounded font-bold shadow-sm hover:bg-green-700">Salvar</button><button onclick="window.cancelGenericEdit()" class="flex-1 bg-red-400 text-white py-2 rounded font-bold shadow-sm hover:bg-red-500">Cancelar</button></div></div>`; 
+            return `<div id="inline-edit-row" class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in border border-slate-200"><h3 class="font-bold text-lg text-navy mb-4 border-b pb-2">${isNew ? 'Adicionar' : 'Editar'} ${lbl}</h3><div class="mb-4"><label class="text-xs font-bold text-navy uppercase block mb-1">${lbl}</label><input id="editNameInput" class="w-full p-3 border border-slate-300 rounded bg-slate-50 focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Nome" value="${isNew ? window.state.tempName : (window.state.tempName || item.name)}" oninput="window.state.tempName=this.value"></div>${sigla ? `<div class="mb-5"><label class="text-xs font-bold text-navy uppercase block mb-1">Sigla</label><input class="w-full p-3 border border-slate-300 rounded bg-slate-50 uppercase focus:ring-2 focus:ring-blue-200 outline-none" placeholder="SIGLA" maxlength="5" value="${isNew ? window.state.tempSigla : (window.state.tempSigla || item.sigla)}" oninput="window.state.tempSigla=this.value.toUpperCase()"></div>` : ''}<div class="flex gap-3 pt-2"><button onclick="window.cancelGenericEdit()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded font-bold hover:bg-slate-200">Cancelar</button><button onclick="window.saveGenericRow('${isNew?'':item.id}', '${sigla}')" class="flex-1 bg-navy text-white py-3 rounded font-bold shadow-lg hover:bg-navy-dark">Salvar</button></div></div>`; 
         }
 
         /**
@@ -670,7 +666,7 @@
         };
 
         window.showConfirmationModal = (text, onConfirm) => {
-            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in"><h3 class="text-lg font-bold text-navy mb-2 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-500"></i> Confirmação</h3><p class="text-slate-600 mb-6 font-medium">${text}</p><div class="flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Não</button><button id="confirm-action-btn" class="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold shadow-lg hover:bg-red-700">Sim, Excluir</button></div></div>`);
+            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-sm p-6 animate-in fade-in zoom-in"><h3 class="text-lg font-bold text-navy mb-2 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-500"></i> Confirmação</h3><p class="text-slate-600 mb-6 font-medium">${text}</p><div class="flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Não</button><button id="confirm-action-btn" class="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold shadow-lg hover:bg-red-700">Sim, Excluir</button></div></div>`);
             const btn = document.getElementById('confirm-action-btn');
             if (btn) btn.onclick = () => { onConfirm(); window.closeModal(); };
         };
@@ -732,13 +728,39 @@
         };
 
         window.getCollectionKeyByScreen = (s) => (s === 'types' ? 'types' : s === 'locations' ? 'locations' : s === 'attendants' ? 'attendants' : '');
-        window.startCreateRow = () => { window.state.isCreatingRow = true; window.state.editingRowId = null; window.state.tempName = ''; window.state.tempSigla = ''; renderApp(); };
+        
+        window.startCreateRow = () => { 
+            window.state.isCreatingRow = true; 
+            window.state.editingRowId = null; 
+            window.state.tempName = ''; 
+            window.state.tempSigla = ''; 
+            const titleMap = { types: 'Tipo de Evento', locations: 'Localidade', attendants: 'Atendente' };
+            const title = titleMap[window.getCollectionKeyByScreen(window.state.currentScreen)];
+            const hasSigla = window.state.currentScreen === 'types';
+            window.showModal(renderInlineRow(null, title, hasSigla, true));
+        };
+        
         window.startEditRow = (id) => {
             const key = window.getCollectionKeyByScreen(window.state.currentScreen);
             const item = window.state[key].find(i => i.id === id);
-            if(item) { window.state.isCreatingRow = false; window.state.editingRowId = id; window.state.tempName = item.name; window.state.tempSigla = item.sigla || ''; renderApp(); }
+            if(item) { 
+                window.state.isCreatingRow = false; 
+                window.state.editingRowId = id; 
+                window.state.tempName = item.name; 
+                window.state.tempSigla = item.sigla || ''; 
+                const titleMap = { types: 'Tipo de Evento', locations: 'Localidade', attendants: 'Atendente' };
+                const title = titleMap[key];
+                const hasSigla = window.state.currentScreen === 'types';
+                window.showModal(renderInlineRow(item, title, hasSigla, false));
+            }
         };
-        window.cancelGenericEdit = () => { window.state.isCreatingRow = false; window.state.editingRowId = null; renderApp(); };
+        
+        window.cancelGenericEdit = () => { 
+            window.state.isCreatingRow = false; 
+            window.state.editingRowId = null; 
+            window.closeModal();
+            renderApp(); 
+        };
 
         /**
          * ==========================================
@@ -763,7 +785,10 @@
                 }
                 calendarHtml += `<button onclick="window.toggleDateSelection('${dateStr}')" class="aspect-square flex flex-col items-center justify-start pt-1.5 rounded-lg border ${isSelected ? 'bg-navy text-white shadow-md border-navy scale-105 z-10' : 'hover:bg-slate-200/60 border-transparent'} ${isToday && !isSelected ? 'bg-blue-50/50 font-bold border-blue-200' : ''}"><span class="text-xs sm:text-sm leading-none mb-1">${day}</span><div class="flex gap-0.5 justify-center flex-wrap px-0.5 w-full">${dotsHtml}</div></button>`;
             }
-            window.showModal(`<div id="calendar-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-4 flex flex-col max-h-[90vh]"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5"></i> Agenda</h3><button onclick="window.closeModal()" class="text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button></div><div class="overflow-y-auto flex-1"> <div class="flex justify-between items-center mb-4 gap-2 bg-slate-50 p-2 rounded-lg"><button onclick="window.changeMonth(-1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-left" class="w-5 h-5"></i></button><div class="flex gap-2 items-center flex-1 justify-center"><select onchange="window.changeViewDate()" id="monthSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${monthNames.map((m, i) => `<option value="${i}" ${i === window.state.viewDate.getMonth() ? 'selected' : ''}>${m}</option>`).join('')}</select><select onchange="window.changeViewDate()" id="yearSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${Array.from({length: 10}, (_, i) => new Date().getFullYear() - 5 + i).map(y => `<option value="${y}" ${y === window.state.viewDate.getFullYear() ? 'selected' : ''}>${y}</option>`).join('')}</select></div><button onclick="window.changeMonth(1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-right" class="w-5 h-5"></i></button></div><div class="grid grid-cols-7 gap-1 text-center text-xs font-black text-slate-400 mb-2"><div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div></div><div class="grid grid-cols-7 gap-1 sm:gap-2 mb-2">${calendarHtml}</div> </div> ${!window.state.pickerTarget ? `<div class="mt-4 pt-3 border-t"><button onclick="window.closeModal(); renderApp()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-navy-dark transition-colors"><i data-lucide="list" class="w-4 h-4"></i> Ver Lista</button></div>` : ''}</div>`);
+            
+            const dayEvents = window.state.events.filter(e => e.date === window.state.selectedDate).sort((a, b) => a.time.localeCompare(b.time));
+
+            window.showModal(`<div id="calendar-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-4 flex flex-col max-h-[90vh]"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5"></i> Agenda</h3><button onclick="window.closeModal()" class="text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button></div><div class="overflow-y-auto flex-1"> <div class="flex justify-between items-center mb-4 gap-2 bg-slate-50 p-2 rounded-lg"><button onclick="window.changeMonth(-1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-left" class="w-5 h-5"></i></button><div class="flex gap-2 items-center flex-1 justify-center"><select onchange="window.changeViewDate()" id="monthSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${monthNames.map((m, i) => `<option value="${i}" ${i === window.state.viewDate.getMonth() ? 'selected' : ''}>${m}</option>`).join('')}</select><select onchange="window.changeViewDate()" id="yearSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${Array.from({length: 10}, (_, i) => new Date().getFullYear() - 5 + i).map(y => `<option value="${y}" ${y === window.state.viewDate.getFullYear() ? 'selected' : ''}>${y}</option>`).join('')}</select></div><button onclick="window.changeMonth(1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-right" class="w-5 h-5"></i></button></div><div class="grid grid-cols-7 gap-1 text-center text-xs font-black text-slate-400 mb-2"><div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div></div><div class="grid grid-cols-7 gap-1 sm:gap-2 mb-2">${calendarHtml}</div> ${!window.state.pickerTarget && window.state.selectedDate ? `<div class="border-t pt-3 mt-2 flex-1 min-h-0 flex flex-col"><div class="text-xs font-bold text-slate-500 uppercase mb-2">Eventos: ${formatDate(window.state.selectedDate)}</div><div class="flex flex-col overflow-y-auto max-h-[220px] border border-slate-200 rounded-lg overflow-hidden">${dayEvents.map(e => { const type = window.state.types.find(t => t.id === e.typeId); const siglaHtml = type?.sigla ? `<span class="px-1.5 py-0.5 rounded bg-navy text-white text-[9px] font-black uppercase">${type.sigla}</span>` : ''; return `<div class="bg-slate-50 border-b border-slate-200 p-2 flex flex-col gap-0.5 last:border-b-0"><div class="flex items-center justify-between"><span class="font-black text-navy text-[10px]">${e.time}</span>${siglaHtml}</div><div class="font-bold text-slate-800 text-[11px] leading-tight">${type?.name || 'Evento'}</div></div>`; }).join('') || '<div class="text-center text-slate-400 text-xs italic py-4">Nada agendado para este dia.</div>'}</div></div>` : ''} </div> ${!window.state.pickerTarget ? `<div class="mt-4 pt-3 border-t"><button onclick="window.closeModal(); renderApp()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-navy-dark transition-colors"><i data-lucide="list" class="w-4 h-4"></i> Ver Lista</button></div>` : ''}</div>`);
         };
 
         window.toggleDateSelection = (d) => { 
@@ -834,7 +859,7 @@
                             </div>
                         </div>
                         <div class="bg-white p-2 rounded shadow-sm border border-slate-200">
-                            <label class="flex items-center gap-2 font-bold text-navy text-xs uppercase cursor-pointer mb-2"><input type="checkbox" ${src.useGroupType?'checked':''} onchange="window.updateAdvFilterState('useGroupType', this.checked); window.openAdvancedFilterModal(true)"> Tipo/Sigla</label>
+                            <label class="flex items-center gap-2 font-bold text-navy text-xs uppercase mb-2 cursor-pointer"><input type="checkbox" ${src.useGroupType?'checked':''} onchange="window.updateAdvFilterState('useGroupType', this.checked); window.openAdvancedFilterModal(true)"> Tipo/Sigla</label>
                             <div class="flex flex-col gap-2 ${!src.useGroupType?'opacity-50 pointer-events-none':''}">
                                 <div class="flex gap-4">
                                     <label class="text-xs font-medium"><input type="radio" name="adv_tp" value="type" ${src.selectedRadio==='type'?'checked':''} onchange="window.updateAdvFilterState('selectedRadio', 'type'); window.openAdvancedFilterModal(true)"> Nome</label>
@@ -906,7 +931,7 @@
 
         function renderNavMenu() { 
             if (!window.state.isMenuOpen) return ''; 
-            return `<div class="fixed inset-0 z-50"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="window.closeMenu()"></div><div class="relative w-72 h-full bg-navy text-white flex flex-col shadow-2xl animate-in slide-in"><div class="p-6 border-b border-white/10 flex justify-between bg-[#002855]"><h2 class="text-xl font-bold">Menu</h2><button onclick="window.closeMenu()"><i data-lucide="x"></i></button></div><nav class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">${[{id: 'home', icon: 'calendar', label: 'Início'}, {id: 'types', icon: 'tag', label: 'Tipos'}, {id: 'locations', icon: 'map-pin', label: 'Locais'}, {id: 'attendants', icon: 'users', label: 'Atendentes'}, {id: 'about', icon: 'info', label: 'Sobre'}].map(i => `<button onclick="window.navigateTo('${i.id}')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 gap-3 border-l-4 border-transparent hover:border-orange-custom"><i data-lucide="${i.icon}" class="text-orange-custom"></i><span>${i.label}</span></button>`).join('')}</nav><div class="p-4 border-t border-white/10 bg-[#002244]">${window.state.user ? `<button onclick="window.handleLogout()" class="w-full flex justify-center gap-2 px-4 py-3 bg-red-600/20 text-red-200 rounded-lg font-bold"><i data-lucide="log-out" class="w-4 h-4"></i> Sair</button>` : `<button onclick="window.showLoginModal()" class="w-full flex justify-center gap-2 px-4 py-3 bg-white/10 text-white rounded-lg font-bold"><i data-lucide="lock" class="w-4 h-4"></i> Login</button>`}</div></div></div>`; 
+            return `<div class="fixed inset-0 z-50"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="window.closeMenu()"></div><div class="relative w-72 h-full bg-navy text-white flex flex-col shadow-2xl animate-in slide-in"><div class="p-6 border-b border-white/10 flex justify-between bg-[#002855]"><h2 class="text-xl font-bold">Menu</h2><button onclick="window.closeMenu()"><i data-lucide="x"></i></button></div><nav class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">${[{id: 'home', icon: 'calendar', label: 'Início'}, {id: 'types', icon: 'tag', label: 'Tipos de Eventos'}, {id: 'locations', icon: 'map-pin', label: 'Locais'}, {id: 'attendants', icon: 'users', label: 'Atendentes'}, {id: 'about', icon: 'info', label: 'Sobre'}].map(i => `<button onclick="window.navigateTo('${i.id}')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 gap-3 border-l-4 border-transparent hover:border-orange-custom"><i data-lucide="${i.icon}" class="text-orange-custom"></i><span>${i.label}</span></button>`).join('')}</nav><div class="p-4 border-t border-white/10 bg-[#002244]">${window.state.user ? `<button onclick="window.handleLogout()" class="w-full flex justify-center gap-2 px-4 py-3 bg-red-600/20 text-red-200 rounded-lg font-bold"><i data-lucide="log-out" class="w-4 h-4"></i> Sair</button>` : `<button onclick="window.showLoginModal()" class="w-full flex justify-center gap-2 px-4 py-3 bg-white/10 text-white rounded-lg font-bold"><i data-lucide="lock" class="w-4 h-4"></i> Login</button>`}</div></div></div>`; 
         }
 
         function renderAbout() { const app = document.getElementById('app'); app.innerHTML = `<div class="flex flex-col h-screen bg-slate-100"><div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10"><button onclick="window.navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button><h1 class="font-bold uppercase tracking-wide">SOBRE</h1></div><div class="p-6 flex flex-col gap-6 text-center text-slate-600 max-w-md mx-auto"><div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-2 text-navy shadow-md"><i data-lucide="calendar-check-2" class="w-12 h-12"></i></div><div><h2 class="text-2xl font-bold text-navy mb-4">Adm Valente</h2><p class="mb-4 text-slate-700">Sistema de gerenciamento de eventos com persistência Firestore e controle administrativo.</p><div class="mt-8 text-xs text-slate-400">Versão 2.0.0</div></div></div></div>`; }
