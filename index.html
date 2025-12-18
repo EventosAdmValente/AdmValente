@@ -150,37 +150,33 @@
          * 1. FIREBASE CONFIGURATION & INITIALIZATION
          * ==========================================
          */
-                    const firebaseConfig = { 
-                apiKey: "AIzaSyCmceNv1eBJLj7aWMcR7crvSVxonuzDVQo", 
-                authDomain: "agendaadmvalente.firebaseapp.com", 
-                projectId: "agendaadmvalente", 
-                storageBucket: "agendaadmvalente.firebasestorage.app", 
-                messagingSenderId: "810572581910", 
-                appId: "1:810572581910:web:155a7e18f6c46f77faf937" 
-            };
-            
-            if (!firebase.apps.length) {
-                firebase.initializeApp(firebaseConfig);
+        const firebaseConfig = { 
+            apiKey: "AIzaSyCmceNv1eBJLj7aWMcR7crvSVxonuzDVQo", 
+            authDomain: "agendaadmvalente.firebaseapp.com", 
+            projectId: "agendaadmvalente", 
+            storageBucket: "agendaadmvalente.firebasestorage.app", 
+            messagingSenderId: "810572581910", 
+            appId: "1:810572581910:web:155a7e18f6c46f77faf937" 
+        };
+
+        const ADMIN_UID = "kRzVsk2nqNTyj79Lk4h6Fmhk7JP2";
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        async function initPersistence() {
+            try {
+                await db.enablePersistence();
+                console.log("Persistência offline ativada.");
+            } catch (err) {
+                console.warn("Persistência falhou:", err.code);
             }
-            
-            const auth = firebase.auth();
-            const db = firebase.firestore();
-            
-            // 1. Chame a função imediatamente aqui
-            (async function() {
-                try {
-                    // synchronizeTabs ajuda se o usuário abrir o app em duas abas
-                    await db.enablePersistence({ synchronizeTabs: true });
-                    console.log("Persistência offline ativada com sucesso!");
-                } catch (err) {
-                    if (err.code == 'failed-precondition') {
-                        console.warn("Persistência falhou: Muitas abas abertas.");
-                    } else if (err.code == 'unimplemented') {
-                        console.warn("Persistência não suportada pelo navegador.");
-                    }
-                }
-            })();
-         /**
+        }
+
+        /**
          * ==========================================
          * 2. STATE MANAGEMENT & UTILS
          * ==========================================
