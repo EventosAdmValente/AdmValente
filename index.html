@@ -161,101 +161,21 @@
 
         const ADMIN_UID = "kRzVsk2nqNTyj79Lk4h6Fmhk7JP2";
 
-        // Inicializa Firebase apenas se não houver um app ativo
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
-        
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        /**
-         * ATIVAÇÃO DA PERSISTÊNCIA OFFLINE
-         * Configurado com synchronizeTabs para evitar erros ao reabrir o app
-         */
         async function initPersistence() {
             try {
-                // synchronizeTabs: true é essencial para PWAs em navegadores mobile
-                await db.enablePersistence({ synchronizeTabs: true });
-                console.log("✅ Persistência offline ativada com sucesso!");
+                await db.enablePersistence();
+                console.log("Persistência offline ativada.");
             } catch (err) {
-                if (err.code == 'failed-precondition') {
-                    console.warn("⚠️ Persistência falhou: Muitas abas abertas.");
-                } else if (err.code == 'unimplemented') {
-                    console.warn("❌ O navegador não suporta persistência.");
-                }
+                console.warn("Persistência falhou:", err.code);
             }
         }
 
-        // Evento para gerenciar o botão "Voltar" do navegador/celular
-        window.addEventListener('popstate', (event) => {
-            const modal = document.getElementById('modal-container');
-            if (modal && !modal.classList.contains('hidden')) {
-                window.closeModal();
-                scheduleRender();
-                return;
-            }
-
-            if (event.state && event.state.screen) {
-                window.state.currentScreen = event.state.screen;
-                if (event.state.screen === 'home') {
-                    window.state.editingEventId = null;
-                }
-            } else {
-                window.state.currentScreen = 'home';
-            }
-        });
-
-        /**
-         * FUNÇÃO DE INICIALIZAÇÃO CORRIGIDA
-         */
-        (async function init() {
-            // 1. Primeiro garante que a persistência está ligada antes de qualquer fetch
-            await initPersistence();
-            
-            // 2. Configura o estado inicial do histórico
-            history.replaceState({ screen: 'home' }, '', '');
-
-            // 3. Monitora autenticação
-            auth.onAuthStateChanged((u) => { 
-                window.state.user = u; 
-                window.state.isAdmin = u?.uid === ADMIN_UID; 
-                // Renderiza a tela após saber quem é o usuário
-                scheduleRender();
-            });
-            
-            // 4. Inicia os Snapshots (eles lerão do CACHE se estiver offline)
-            const collections = ['agenda', 'types', 'locations', 'attendants'];
-            const keys = { 
-                'agenda': 'events', 
-                'types': 'types', 
-                'locations': 'locations', 
-                'attendants': 'attendants' 
-            };
-
-            collections.forEach(col => {
-                db.collection(col).onSnapshot({ includeMetadataChanges: true }, (snap) => { 
-                    window.state[keys[col]] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    
-                    // Log para conferir se os dados vieram do cache ou do servidor
-                    const source = snap.metadata.fromCache ? "Cache local" : "Servidor";
-                    console.log(`Dados de ${col} carregados via: ${source}`);
-                    
-                    scheduleRender();
-                }, (error) => {
-                    console.error(`Erro ao carregar ${col}:`, error);
-                });
-            });
-        })();
-
-        // Registro do Service Worker (Mantido conforme seu original)
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('SW registrado', reg))
-                    .catch(err => console.log('Erro SW', err));
-            });
-        }
         /**
          * ==========================================
          * 2. STATE MANAGEMENT & UTILS
@@ -514,7 +434,7 @@
                 </div>
             `);
             setTimeout(window.adjustReportScale, 50);
-            ('resize', window.adjustReportScale);
+            window.addEventListener('resize', window.adjustReportScale);
         };
 
         window.confirmPDFDownload = () => {
