@@ -543,58 +543,89 @@
          */
         function renderGenericManager(title, collectionKey, nameLabel, hasSigla) { 
             const appElement = document.getElementById('app'); 
-            if(appElement) {
-                const colList = (window.state[collectionKey] || []).sort((a, b) => a.name.localeCompare(b.name));
-                let iconName = 'folder';
-                if (collectionKey === 'types') iconName = 'tag';
-                if (collectionKey === 'locations') iconName = 'map-pin';
-                if (collectionKey === 'attendants') iconName = 'user';
-                appElement.innerHTML = `
-                    <div class="flex flex-col h-screen bg-slate-100">
-                        <div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10 flex-shrink-0">
-                            <button onclick="window.navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button>
-                            <h1 class="font-bold uppercase tracking-wide">${title}</h1>
+            if(!appElement) return;
+
+            let container = document.getElementById('manager-container');
+            if (container && container.dataset.screen !== window.state.currentScreen) {
+                appElement.innerHTML = ''; 
+                container = null;
+            }
+
+            if (!container) {
+                appElement.innerHTML = '';
+                container = document.createElement('div');
+                container.id = 'manager-container';
+                container.dataset.screen = window.state.currentScreen;
+                container.className = "flex flex-col h-screen bg-slate-100";
+                
+                container.innerHTML = `
+                    <div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10 flex-shrink-0">
+                        <button onclick="window.navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button>
+                        <h1 class="font-bold uppercase tracking-wide">${title}</h1>
+                    </div>
+                    <div class="p-4 flex-1 overflow-hidden flex flex-col gap-4 max-w-xl mx-auto w-full">
+                        <div class="relative shrink-0">
+                            <input id="managerSearch" type="text" placeholder="Buscar..." class="w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-navy/20" value="${window.state.managerSearchTerm}">
+                            <i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
                         </div>
-                        <div class="p-4 flex-1 overflow-hidden flex flex-col gap-4 max-w-xl mx-auto w-full">
-                            <div class="relative shrink-0">
-                                <input id="managerSearch" type="text" placeholder="Buscar..." class="w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-navy/20" value="${window.state.managerSearchTerm}" oninput="window.state.managerSearchTerm = this.value">
-                                <i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
-                            </div>
-                            <div class="flex-1 overflow-y-auto border border-slate-200 bg-slate-50 rounded-xl shadow-md min-h-0">
-                                <ul class="divide-y divide-slate-200/50">
-                                    ${colList.filter((i)=>i.name.toLowerCase().includes(window.state.managerSearchTerm.toLowerCase())).map((i) => {
-                                        return `
-                                            <li class="p-3 border-b border-slate-200/50 last:border-0 bg-white hover:bg-slate-50 transition-colors">
-                                                <div class="flex items-center gap-3">
-                                                    <div class="w-10 h-10 rounded-full bg-blue-50 text-navy flex items-center justify-center border border-blue-100 shrink-0">
-                                                        <i data-lucide="${iconName}" class="w-5 h-5"></i>
-                                                    </div>
-                                                    <div class="flex-1 min-w-0">
-                                                        <div class="flex items-center justify-between gap-2">
-                                                            <span class="font-bold text-navy text-sm sm:text-base break-words">${i.name}</span>
-                                                            ${hasSigla && i.sigla ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 shrink-0 border border-slate-300">${i.sigla}</span>` : ''}
-                                                        </div>
-                                                    </div>
-                                                    ${window.state.isAdmin ? `
-                                                    <div class="flex gap-1 shrink-0">
-                                                        <button onclick="window.startEditRow('${i.id}')" class="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-                                                        <button onclick="window.requestDeleteRow('${i.id}', '${collectionKey}', '${i.name}')" class="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                                    </div>` : ''}
-                                                </div>
-                                            </li>
-                                        `;
-                                    }).join('')}
-                                </ul>
-                                ${colList.length === 0 ? `<div class="p-8 text-center text-slate-400 italic">Nenhum registro encontrado.</div>` : ''}
-                            </div>
-                            ${window.state.isAdmin ? `
-                            <button onclick="window.startCreateRow()" class="w-full py-3 bg-navy text-white rounded-lg font-bold shadow-lg shadow-blue-900/20 hover:bg-navy-dark flex items-center justify-center gap-2 shrink-0 transition-colors">
-                                <i data-lucide="plus" class="w-4 h-4"></i> Adicionar
-                            </button>` : ''}
+                        <div id="manager-list-container" class="flex-1 overflow-y-auto border border-slate-200 bg-slate-50 rounded-xl shadow-md min-h-0">
                         </div>
+                        ${window.state.isAdmin ? `
+                        <button onclick="window.startCreateRow()" class="w-full py-3 bg-navy text-white rounded-lg font-bold shadow-lg shadow-blue-900/20 hover:bg-navy-dark flex items-center justify-center gap-2 shrink-0 transition-colors">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Adicionar
+                        </button>` : ''}
                     </div>
                 `;
+                appElement.appendChild(container);
+                document.getElementById('managerSearch').addEventListener('input', (e) => {
+                    window.state.managerSearchTerm = e.target.value;
+                    window.updateGenericList(collectionKey);
+                });
             }
+            window.updateGenericList(collectionKey);
+        }
+
+        window.updateGenericList = (collectionKey) => {
+            const listContainer = document.getElementById('manager-list-container');
+            if (!listContainer) return;
+
+            const colList = (window.state[collectionKey] || []).sort((a, b) => a.name.localeCompare(b.name));
+            const hasSigla = collectionKey === 'types';
+            let iconName = 'folder';
+            if (collectionKey === 'types') iconName = 'tag';
+            if (collectionKey === 'locations') iconName = 'map-pin';
+            if (collectionKey === 'attendants') iconName = 'user';
+
+            const filtered = colList.filter((i)=>i.name.toLowerCase().includes(window.state.managerSearchTerm.toLowerCase()));
+
+            listContainer.innerHTML = `
+                <ul class="divide-y divide-slate-200/50">
+                    ${filtered.map((i) => {
+                        return `
+                            <li class="p-3 border-b border-slate-200/50 last:border-0 bg-white hover:bg-slate-50 transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-blue-50 text-navy flex items-center justify-center border border-blue-100 shrink-0">
+                                        <i data-lucide="${iconName}" class="w-5 h-5"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <span class="font-bold text-navy text-sm sm:text-base break-words">${i.name}</span>
+                                            ${hasSigla && i.sigla ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 shrink-0 border border-slate-300">${i.sigla}</span>` : ''}
+                                        </div>
+                                    </div>
+                                    ${window.state.isAdmin ? `
+                                    <div class="flex gap-1 shrink-0">
+                                        <button onclick="window.startEditRow('${i.id}')" class="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                                        <button onclick="window.requestDeleteRow('${i.id}', '${collectionKey}', '${i.name}')" class="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    </div>` : ''}
+                                </div>
+                            </li>
+                        `;
+                    }).join('')}
+                </ul>
+                ${filtered.length === 0 ? `<div class="p-8 text-center text-slate-400 italic">Nenhum registro encontrado.</div>` : ''}
+            `;
+            window.renderIcons();
         }
 
         function renderInlineRow(item, lbl, sigla, isNew) { 
@@ -689,11 +720,12 @@
             if (push) history.pushState({ screen: screen }, '', ''); 
             window.state.isMenuOpen = false; 
             window.state.currentScreen = screen; 
-            window.state.editingRowId = null; 
-            window.state.isCreatingRow = false; 
-            window.state.tempName = ''; 
-            window.state.tempSigla = ''; 
-            window.state.managerSearchTerm = '';
+            
+            // Cleanup persistent containers to force re-render on new screen
+            ['home-container', 'manager-container', 'event-form-container'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.remove();
+            });
         };
         window.openMenu = () => { window.state.isMenuOpen = true; };
         window.closeMenu = () => { window.state.isMenuOpen = false; };
@@ -1011,18 +1043,15 @@
                                 <li class="flex items-start gap-3"><i data-lucide="calendar" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Agenda interativa com visualização mensal e diária.</span></li>
                                 <li class="flex items-start gap-3"><i data-lucide="filter" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Filtros avançados para buscas precisas por múltiplos critérios.</span></li>
                                 <li class="flex items-start gap-3"><i data-lucide="file-text" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Exportação de relatórios profissionais em formatos PDF e PNG.</span></li>
-                                <li class="flex items-start gap-3"><i data-lucide="refresh-cw" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Sincronização em tempo real e suporte robusto para uso offline.</span></li>
                                 <li class="flex items-start gap-3"><i data-lucide="shield-check" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Segurança avançada com controle administrativo autenticado.</span></li>
                             </ul>
                         </div>
-                        <div class="bg-blue-50 p-5 rounded-2xl border border-blue-100">
-                            <h3 class="font-bold text-navy mb-2 flex items-center gap-2 text-sm uppercase tracking-wide"><i data-lucide="code" class="w-4 h-4"></i> Créditos</h3>
-                            <p class="text-xs text-slate-700">Sistema idealizado e desenvolvido por:</p>
-                            <p class="text-lg font-black text-navy mt-1">Marcos de Lima</p>
+                        <div class="bg-blue-50 p-5 rounded-2xl border border-blue-100 text-center">
+                            <p class="text-lg font-medium text-slate-700">Sistema idealizado e desenvolvido por:</p>
+                            <p class="text-sm font-black text-navy mt-1">Marcos de Lima</p>
                         </div>
                         <div class="text-center pt-4">
                             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Versão 2.1.0</p>
-                            <p class="text-[9px] text-slate-300 font-medium">© 2024 Adm Valente - Todos os direitos reservados</p>
                         </div>
                     </div>
                 </div>`; 
