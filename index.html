@@ -698,6 +698,7 @@
                         <div class="pt-4 flex flex-col gap-3 border-t mt-2">
                             ${window.state.isAdmin ? `<button type="button" onclick="window.saveEvent()" class="w-full py-3 bg-navy text-white rounded-lg font-bold shadow-lg shadow-blue-900/20 hover:bg-navy-dark flex items-center justify-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Salvar Evento</button>` : ''}
                             ${isEditing && window.state.isAdmin ? `<button type="button" onclick="window.deleteEvent()" class="w-full py-3 border border-red-200 text-red-600 bg-red-50 rounded-lg font-bold hover:bg-red-100 flex items-center justify-center gap-2"><i data-lucide="trash-2" class="w-4 h-4"></i> Excluir Evento</button>` : ''}
+                            <button type="button" onclick="navigateTo('home')" class="w-full py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200 flex items-center justify-center gap-2 transition-colors">Cancelar</button>
                         </div>
                     </div>
                 </div>
@@ -1256,6 +1257,103 @@
                 });
             });
         })();
+
+        window.showDuplicateWarning = (text, onLocate) => {
+            window.showModal(`
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in border-t-4 border-orange-custom">
+                    <h3 class="text-lg font-bold text-navy mb-2 flex items-center gap-2"><i data-lucide="copy" class="text-orange-custom"></i> Registro Duplicado</h3>
+                    <p class="text-slate-600 mb-6 text-sm font-medium leading-relaxed">${text}</p>
+                    <div class="flex flex-col gap-2">
+                        <button id="locate-dup-btn" class="w-full py-3 bg-navy text-white rounded-lg font-bold shadow-lg hover:bg-navy-dark flex items-center justify-center gap-2"><i data-lucide="search" class="w-4 h-4"></i> Localizar Duplicata</button>
+                        <button onclick="window.closeModal()" class="w-full py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Cancelar e Editar</button>
+                    </div>
+                </div>
+            `);
+            const btn = document.getElementById('locate-dup-btn');
+            if (btn) btn.onclick = () => { onLocate(); window.closeModal(); };
+        };
+
+        window.saveEvent = async () => { 
+            const btnDate = document.getElementById('btnDate');
+            const btnTime = document.getElementById('btnTime');
+            const evtLoc = document.getElementById('evtLoc');
+            const evtType = document.getElementById('evtType');
+            btnDate?.classList.remove('input-error');
+            btnTime?.classList.remove('input-error');
+            evtLoc?.classList.remove('input-error');
+            evtType?.classList.remove('input-error');
+            const date = window.state.formTempDate;
+            const time = window.state.formTempTime;
+            const locationId = evtLoc ? evtLoc.value : '';
+            const typeId = evtType ? evtType.value : '';
+            const attendantId = document.getElementById('evtAtt')?.value || "";
+            let isValid = true;
+            if (!date) { btnDate?.classList.add('input-error'); isValid = false; }
+            if (!time) { btnTime?.classList.add('input-error'); isValid = false; }
+            if (!locationId) { evtLoc?.classList.add('input-error'); isValid = false; }
+            if (!typeId) { evtType?.classList.add('input-error'); isValid = false; }
+            if (!isValid) return;
+
+            // Verificação de Duplicata
+            const duplicate = window.state.events.find(ev => 
+                ev.id !== window.state.editingEventId &&
+                ev.date === date &&
+                ev.time === time &&
+                ev.locationId === locationId &&
+                ev.typeId === typeId &&
+                ev.attendantId === attendantId
+            );
+            if (duplicate) {
+                window.showDuplicateWarning("Já existe um evento idêntico agendado para este horário e local.", () => {
+                    window.resetAllFilters();
+                    window.state.selectedDate = duplicate.date;
+                    window.navigateTo('home');
+                });
+                return;
+            }
+
+            try { 
+                const payload = { date, time, locationId, typeId, attendantId: attendantId || "" };
+                if (window.state.editingEventId) await db.collection("agenda").doc(window.state.editingEventId).update(payload);
+                else await db.collection("agenda").add(payload);
+                window.state.editingEventId = null; window.resetAllFilters(); window.navigateTo('home'); 
+            } catch(e) { alert('Erro ao salvar.'); }
+        };
+
+        window.saveGenericRow = async (id, hasSigla) => {
+            const nameInput = document.getElementById('editNameInput');
+            const name = nameInput ? nameInput.value.trim() : '';
+            if (!name) return alert("O nome é obrigatório.");
+            
+            const collKey = window.getCollectionKeyByScreen(window.state.currentScreen);
+            if (!collKey) return;
+
+            // Verificação de Duplicata de Nome
+            const duplicate = window.state[collKey].find(i => 
+                i.id !== id && 
+                i.name.toLowerCase() === name.toLowerCase()
+            );
+            if (duplicate) {
+                window.showDuplicateWarning(`Já existe um registro com o nome "${name}" nesta categoria.`, () => {
+                    window.state.managerSearchTerm = name;
+                    window.closeModal();
+                });
+                return;
+            }
+
+            const payload = { name };
+            if (hasSigla === true || hasSigla === 'true') {
+                const siglaInput = document.getElementById('editSiglaInput');
+                payload.sigla = siglaInput ? siglaInput.value.trim().toUpperCase() : '';
+            }
+            
+            try {
+                if (id) await db.collection(collKey).doc(id).update(payload);
+                else await db.collection(collKey).add(payload);
+                window.cancelGenericEdit();
+            } catch (err) { alert("Erro ao salvar: " + err.message); }
+        };
+
     </script>
 </body>
 </html>
