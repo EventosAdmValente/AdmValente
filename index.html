@@ -30,21 +30,10 @@
         html, body, * { -ms-overflow-style: none; scrollbar-width: none; }
         .bg-navy { background-color: #003366; } .text-navy { color: #003366; } .border-navy { border-color: #003366; } .hover-bg-navy-dark:hover { background-color: #002855; }
         .bg-orange-custom { background-color: #FF8C00; } .text-orange-custom { color: #FF8C00; } .border-orange-custom { border-color: #FF8C00; } .hover-bg-orange-dark:hover { background-color: #e67e00; }
-        .animate-in { animation-duration: 0.2s; animation-fill-mode: both; }
-        .fade-in { animation-name: fadeIn; } .zoom-in { animation-name: zoomIn; } .slide-in { animation: slideIn 0.3s ease-out; } .slide-in-from-top-2 { animation: slideInTop 0.2s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
-        @keyframes slideInTop { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         input:focus, select:focus, textarea:focus { outline: none; }
         input:-webkit-autofill { -webkit-box-shadow: 0 0 0 30px white inset !important; }
         .disabled-area { opacity: 0.5; pointer-events: none; filter: grayscale(1); }
-        .input-error { border-color: #ef4444 !important; background-color: #fef2f2 !important; animation: shake 0.3s ease-in-out; }
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-4px); }
-            75% { transform: translateX(4px); }
-        }
+        .input-error { border-color: #ef4444 !important; background-color: #fef2f2 !important; }
 
         .loading-container {
             display: flex;
@@ -128,7 +117,7 @@
 
     <!-- Template: Login Modal -->
     <template id="login-modal-template">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div class="p-5 border-b border-slate-100 bg-slate-50">
                 <h3 class="font-bold text-lg text-navy">Área Administrativa</h3>
             </div>
@@ -261,7 +250,7 @@
                 target[property] = value;
                 if (typeof property === 'string') {
                     if (['events', 'types', 'locations', 'attendants'].includes(property)) saveCache(property, value);
-                    const isSilent = ['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm', 'formTempDate', 'formTempTime', 'highlightedId'].includes(property);
+                    const isSilent = ['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm', 'formTempDate', 'formTempTime', 'highlightedId', 'fastFilterLabel'].includes(property);
                     if (!isSilent) scheduleRender();
                     else { 
                         if (property === 'searchTerm') { 
@@ -434,7 +423,7 @@
             }).join('');
 
             window.showModal(`
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[95vh] animate-in zoom-in overflow-hidden">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[95vh] overflow-hidden">
                     <div class="p-4 border-b bg-slate-50 flex justify-between items-center flex-shrink-0">
                         <h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="file-text"></i> Visualizar Lista</h3>
                         <button onclick="window.closeModal()"><i data-lucide="x" class="w-6 h-6 text-slate-400"></i></button>
@@ -630,7 +619,7 @@
         }
 
         function renderInlineRow(item, lbl, sigla, isNew) { 
-            return `<div id="inline-edit-row" class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in border border-slate-200"><h3 class="font-bold text-lg text-navy mb-4 border-b pb-2">${isNew ? 'Adicionar' : 'Editar'} ${lbl}</h3><div class="mb-4"><label class="text-xs font-bold text-navy uppercase block mb-1">${lbl}</label><input id="editNameInput" class="w-full p-3 border border-slate-300 rounded bg-slate-50 focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Nome" value="${isNew ? window.state.tempName : (window.state.tempName || item.name)}" oninput="window.state.tempName=this.value"></div>${sigla ? `<div class="mb-5"><label class="text-xs font-bold text-navy uppercase block mb-1">Sigla</label><input id="editSiglaInput" class="w-full p-3 border border-slate-300 rounded bg-slate-50 uppercase focus:ring-2 focus:ring-blue-200 outline-none" placeholder="SIGLA" maxlength="5" value="${isNew ? window.state.tempSigla : (window.state.tempSigla || item.sigla)}" oninput="window.state.tempSigla=this.value.toUpperCase()"></div>` : ''}<div class="flex gap-3 pt-2"><button onclick="window.cancelGenericEdit()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded font-bold hover:bg-slate-200">Cancelar</button><button onclick="window.saveGenericRow('${isNew?'':item.id}', ${sigla})" class="flex-1 bg-navy text-white py-3 rounded font-bold shadow-lg hover:bg-navy-dark">Salvar</button></div></div>`; 
+            return `<div id="inline-edit-row" class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200"><h3 class="font-bold text-lg text-navy mb-4 border-b pb-2">${isNew ? 'Adicionar' : 'Editar'} ${lbl}</h3><div class="mb-4"><label class="text-xs font-bold text-navy uppercase block mb-1">${lbl}</label><input id="editNameInput" class="w-full p-3 border border-slate-300 rounded bg-slate-50 focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Nome" value="${isNew ? window.state.tempName : (window.state.tempName || item.name)}" oninput="window.state.tempName=this.value"></div>${sigla ? `<div class="mb-5"><label class="text-xs font-bold text-navy uppercase block mb-1">Sigla</label><input id="editSiglaInput" class="w-full p-3 border border-slate-300 rounded bg-slate-50 uppercase focus:ring-2 focus:ring-blue-200 outline-none" placeholder="SIGLA" maxlength="5" value="${isNew ? window.state.tempSigla : (window.state.tempSigla || item.sigla)}" oninput="window.state.tempSigla=this.value.toUpperCase()"></div>` : ''}<div class="flex gap-3 pt-2"><button onclick="window.cancelGenericEdit()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded font-bold hover:bg-slate-200">Cancelar</button><button onclick="window.saveGenericRow('${isNew?'':item.id}', ${sigla})" class="flex-1 bg-navy text-white py-3 rounded font-bold shadow-lg hover:bg-navy-dark">Salvar</button></div></div>`; 
         }
 
         /**
@@ -760,14 +749,14 @@
             } 
         };
         window.showConfirmationModal = (text, onConfirm) => {
-            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in"><h3 class="text-lg font-bold text-navy mb-2 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-500"></i> Confirmação</h3><p class="text-slate-600 mb-6 font-medium">${text}</p><div class="flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Não</button><button id="confirm-action-btn" class="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold shadow-lg hover:bg-red-700">Sim, Excluir</button></div></div>`);
+            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6"><h3 class="text-lg font-bold text-navy mb-2 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-500"></i> Confirmação</h3><p class="text-slate-600 mb-6 font-medium">${text}</p><div class="flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Não</button><button id="confirm-action-btn" class="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold shadow-lg hover:bg-red-700">Sim, Excluir</button></div></div>`);
             const btn = document.getElementById('confirm-action-btn');
             if (btn) btn.onclick = () => { onConfirm(); window.closeModal(); };
         };
 
         window.showDuplicateWarning = (text, onLocate, onBackToEdit) => {
             window.showModal(`
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in border-t-4 border-orange-custom">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 border-t-4 border-orange-custom">
                     <h3 class="text-lg font-bold text-navy mb-2 flex items-center gap-2"><i data-lucide="copy" class="text-orange-custom"></i> Registro Duplicado</h3>
                     <p class="text-slate-600 mb-6 text-sm font-medium leading-relaxed">${text}</p>
                     <div class="flex flex-col gap-2">
@@ -782,7 +771,7 @@
 
         /**
          * ==========================================
-         * 9. LOGICA DE NEGÓCIO (SALVAR, FILTRAR)
+         * 9. LOGICA DE NEGÓCIO (SALVAR, FILTRAR, EXCLUIR)
          * ==========================================
          */
         window.saveEvent = async () => { 
@@ -812,6 +801,20 @@
                 else await db.collection("agenda").add(payload);
                 window.state.editingEventId = null; window.resetAllFilters(); window.navigateTo('home'); 
             } catch(e) { alert('Erro ao salvar.'); }
+        };
+
+        window.deleteEvent = () => {
+            const id = window.state.editingEventId;
+            if (!id) return;
+            window.showConfirmationModal("Deseja realmente excluir este evento?", async () => {
+                try {
+                    await db.collection("agenda").doc(id).delete();
+                    window.state.editingEventId = null;
+                    window.navigateTo('home');
+                } catch (e) {
+                    alert("Erro ao excluir o evento.");
+                }
+            });
         };
 
         window.saveGenericRow = async (id, hasSigla) => {
@@ -940,7 +943,7 @@
         window.confirmTimeSelection = () => { window.state.formTempTime = `${window.tempTimeH}:${window.tempTimeM}`; window.closeModal(); };
 
         window.openFastFilterModal = () => {
-            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in"><div class="p-4 border-b bg-navy text-white flex justify-between items-center"><h3 class="font-bold text-lg flex items-center gap-2"><i data-lucide="filter"></i> Eventos para</h3><button onclick="window.closeModal()"><i data-lucide="x" class="w-6 h-6"></i></button></div><div class="p-6 bg-slate-50 flex flex-col gap-3">${['Hoje', 'Essa Semana', 'Esse Mês', 'Esse Ano'].map((l, i) => `<label class="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors"><input type="radio" name="fastFilterRange" value="${['hoje','semana','mes','ano'][i]}" ${i===0?'checked':''} class="w-4 h-4 text-navy"><span class="font-bold text-navy">${l}</span></label>`).join('')}</div><div class="p-4 border-t bg-white flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold">Cancelar</button><button onclick="window.applyFastFilter()" class="flex-1 py-3 bg-navy text-white rounded-lg font-bold shadow-lg">Filtrar</button></div></div>`);
+            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden"><div class="p-4 border-b bg-navy text-white flex justify-between items-center"><h3 class="font-bold text-lg flex items-center gap-2"><i data-lucide="filter"></i> Eventos para</h3><button onclick="window.closeModal()"><i data-lucide="x" class="w-6 h-6"></i></button></div><div class="p-6 bg-slate-50 flex flex-col gap-3">${['Hoje', 'Essa Semana', 'Esse Mês', 'Esse Ano'].map((l, i) => `<label class="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors"><input type="radio" name="fastFilterRange" value="${['hoje','semana','mes','ano'][i]}" ${i===0?'checked':''} class="w-4 h-4 text-navy"><span class="font-bold text-navy">${l}</span></label>`).join('')}</div><div class="p-4 border-t bg-white flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold">Cancelar</button><button onclick="window.applyFastFilter()" class="flex-1 py-3 bg-navy text-white rounded-lg font-bold shadow-lg">Filtrar</button></div></div>`);
         };
 
         window.applyFastFilter = () => {
@@ -979,17 +982,18 @@
         };
 
         window.openAdvancedFilterModal = (restore = false) => {
-            const src = (restore && window.state.tempAdvFilter) ? window.state.tempAdvFilter : window.state.advancedFilter; window.state.tempAdvFilter = { ...src };
+            if (!restore) window.state.tempAdvFilter = { ...defaultAdvancedFilter };
+            const src = window.state.tempAdvFilter;
             const typeOpts = `<option value="">Selecione...</option>` + window.state.types.sort((a,b)=>a.name.localeCompare(b.name)).map(t => `<option value="${t.id}" ${t.id === src.valType ? 'selected' : ''}>${t.name}</option>`).join('');
             const sigOpts = `<option value="">Selecione...</option>` + window.state.types.filter(t=>t.sigla).sort((a,b)=>a.sigla.localeCompare(b.sigla)).map(t => `<option value="${t.id}" ${t.id === src.valSigla ? 'selected' : ''}>${t.sigla}</option>`).join('');
             const locOpts = `<option value="">Selecione...</option>` + window.state.locations.sort((a,b)=>a.name.localeCompare(b.name)).map(l => `<option value="${l.id}" ${l.id === src.valLoc ? 'selected' : ''}>${l.name}</option>`).join('');
             const attOpts = `<option value="">Selecione...</option>` + window.state.attendants.sort((a,b)=>a.name.localeCompare(b.name)).map(a => `<option value="${a.id}" ${a.id === src.valAtt ? 'selected' : ''}>${a.name}</option>`).join('');
             const dsDisp = src.dateStart ? formatDateFull(src.dateStart) : 'Selecione...'; const deDisp = src.dateEnd ? formatDateFull(src.dateEnd) : 'Selecione...';
-            window.showModal(`<div id="advanced-filter-modal" class="bg-white rounded-xl shadow-2xl w-full max-md p-0 overflow-hidden flex flex-col max-h-[90vh]"><div class="p-3 border-b border-slate-100 flex justify-between items-center bg-navy text-white"><h3 class="font-bold text-base flex items-center gap-2"><i data-lucide="filter" class="w-4 h-4"></i> Informe os dados para Filtrar</h3><button onclick="window.closeModal()"><i data-lucide="x" class="w-5 h-5"></i></button></div><div class="p-3 overflow-y-auto flex-1 flex flex-col gap-2 bg-slate-50"><div class="bg-white p-2 rounded shadow-sm border border-slate-200"><div class="flex items-center justify-between mb-1"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase cursor-pointer"><input type="checkbox" ${src.useStatus?'checked':''} onchange="window.updateAdvFilterState('useStatus', this.checked); window.openAdvancedFilterModal(true)"> Status</label><div class="flex gap-3 ${!src.useStatus?'opacity-50 pointer-events-none':''}"> <label class="text-xs font-medium"><input type="radio" name="adv_st" value="active" ${src.statusVal==='active'?'checked':''} onchange="window.updateAdvFilterState('statusVal', 'active')"> Ativos</label> <label class="text-xs font-medium"><input type="radio" name="adv_st" value="inactive" ${src.statusVal==='inactive'?'checked':''} onchange="window.updateAdvFilterState('statusVal', 'inactive')"> Inativos</label></div></div></div><div class="bg-white p-2 rounded shadow-sm border border-slate-200"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase mb-2 cursor-pointer"><input type="checkbox" ${src.useGroupType?'checked':''} onchange="window.updateAdvFilterState('useGroupType', this.checked); window.openAdvancedFilterModal(true)"> Tipo/Sigla</label><div class="flex flex-col gap-2 ${!src.useGroupType?'opacity-50 pointer-events-none':''}"><div class="flex gap-4"> <label class="text-xs font-medium"><input type="radio" name="adv_tp" value="type" ${src.selectedRadio==='type'?'checked':''} onchange="window.updateAdvFilterState('selectedRadio', 'type'); window.openAdvancedFilterModal(true)"> Nome</label> <label class="text-xs font-medium"><input type="radio" name="adv_tp" value="sigla" ${src.selectedRadio==='sigla'?'checked':''} onchange="window.updateAdvFilterState('selectedRadio', 'sigla'); window.openAdvancedFilterModal(true)"> Sigla</label></div><select class="w-full p-1.5 border rounded text-xs bg-white" onchange="window.updateAdvFilterState(window.state.tempAdvFilter.selectedRadio==='type'?'valType':'valSigla', this.value)">${src.selectedRadio==='type'?typeOpts:sigOpts}</select></div></div><div class="grid grid-cols-2 gap-2"><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-[10px] uppercase mb-1"><input type="checkbox" ${src.useLoc?'checked':''} onchange="window.updateAdvFilterState('useLoc', this.checked); window.openAdvancedFilterModal(true)"> Local</label><select class="w-full p-1 border rounded text-[10px] bg-white ${!src.useLoc?'opacity-50 pointer-events-none':''}" onchange="window.updateAdvFilterState('valLoc', this.value)">${locOpts}</select></div><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-[10px] uppercase mb-1"><input type="checkbox" ${src.useAtt?'checked':''} onchange="window.updateAdvFilterState('useAtt', this.checked); window.openAdvancedFilterModal(true)"> Atendente</label><select class="w-full p-1 border rounded text-[10px] bg-white ${!src.useAtt?'opacity-50 pointer-events-none':''}" onchange="window.updateAdvFilterState('valAtt', this.value)">${attOpts}</select></div></div><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase mb-2 cursor-pointer"><input type="checkbox" ${src.useDate?'checked':''} onchange="window.updateAdvFilterState('useDate', this.checked); window.openAdvancedFilterModal(true)"> Datas</label><div class="grid grid-cols-2 gap-2 ${!src.useDate?'opacity-50 pointer-events-none':''}"><button onclick="window.openFilterDate('adv_dateStart')" class="p-1.5 border rounded text-xs bg-white text-left truncate">${dsDisp}</button><button onclick="window.openFilterDate('adv_dateEnd')" class="p-1.5 border rounded text-xs bg-white text-left truncate">${deDisp}</button></div></div></div><div class="p-3 bg-white border-t flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-2 bg-slate-100 text-slate-600 rounded font-bold text-sm">Cancelar</button><button onclick="window.applyAdvancedFilter()" class="flex-1 py-2 bg-navy text-white rounded font-bold text-sm shadow">Filtrar</button></div></div>`);
+            window.showModal(`<div id="advanced-filter-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-md p-0 overflow-hidden flex flex-col max-h-[90vh]"><div class="p-3 border-b border-slate-100 flex justify-between items-center bg-navy text-white"><h3 class="font-bold text-base flex items-center gap-2"><i data-lucide="filter" class="w-4 h-4"></i> Informe os dados para Filtrar</h3><button onclick="window.closeModal()"><i data-lucide="x" class="w-5 h-5"></i></button></div><div class="p-3 overflow-y-auto flex-1 flex flex-col gap-2 bg-slate-50"><div class="bg-white p-2 rounded shadow-sm border border-slate-200"><div class="flex items-center justify-between mb-1"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase cursor-pointer"><input type="checkbox" ${src.useStatus?'checked':''} onchange="window.updateAdvFilterState('useStatus', this.checked); window.openAdvancedFilterModal(true)"> Status</label><div class="flex gap-3 ${!src.useStatus?'opacity-50 pointer-events-none':''}"> <label class="text-xs font-medium"><input type="radio" name="adv_st" value="active" ${src.statusVal==='active'?'checked':''} onchange="window.updateAdvFilterState('statusVal', 'active')"> Ativos</label> <label class="text-xs font-medium"><input type="radio" name="adv_st" value="inactive" ${src.statusVal==='inactive'?'checked':''} onchange="window.updateAdvFilterState('statusVal', 'inactive')"> Inativos</label></div></div></div><div class="bg-white p-2 rounded shadow-sm border border-slate-200"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase mb-2 cursor-pointer"><input type="checkbox" ${src.useGroupType?'checked':''} onchange="window.updateAdvFilterState('useGroupType', this.checked); window.openAdvancedFilterModal(true)"> Tipo/Sigla</label><div class="flex flex-col gap-2 ${!src.useGroupType?'opacity-50 pointer-events-none':''}"><div class="flex gap-4"> <label class="text-xs font-medium"><input type="radio" name="adv_tp" value="type" ${src.selectedRadio==='type'?'checked':''} onchange="window.updateAdvFilterState('selectedRadio', 'type'); window.openAdvancedFilterModal(true)"> Nome</label> <label class="text-xs font-medium"><input type="radio" name="adv_tp" value="sigla" ${src.selectedRadio==='sigla'?'checked':''} onchange="window.updateAdvFilterState('selectedRadio', 'sigla'); window.openAdvancedFilterModal(true)"> Sigla</label></div><select class="w-full p-1.5 border rounded text-xs bg-white" onchange="window.updateAdvFilterState(window.state.tempAdvFilter.selectedRadio==='type'?'valType':'valSigla', this.value)">${src.selectedRadio==='type'?typeOpts:sigOpts}</select></div></div><div class="grid grid-cols-2 gap-2"><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-[10px] uppercase mb-1"><input type="checkbox" ${src.useLoc?'checked':''} onchange="window.updateAdvFilterState('useLoc', this.checked); window.openAdvancedFilterModal(true)"> Local</label><select class="w-full p-1 border rounded text-[10px] bg-white ${!src.useLoc?'opacity-50 pointer-events-none':''}" onchange="window.updateAdvFilterState('valLoc', this.value)">${locOpts}</select></div><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-[10px] uppercase mb-1"><input type="checkbox" ${src.useAtt?'checked':''} onchange="window.updateAdvFilterState('useAtt', this.checked); window.openAdvancedFilterModal(true)"> Atendente</label><select class="w-full p-1 border rounded text-[10px] bg-white ${!src.useAtt?'opacity-50 pointer-events-none':''}" onchange="window.updateAdvFilterState('valAtt', this.value)">${attOpts}</select></div></div><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase mb-2 cursor-pointer"><input type="checkbox" ${src.useDate?'checked':''} onchange="window.updateAdvFilterState('useDate', this.checked); window.openAdvancedFilterModal(true)"> Datas</label><div class="grid grid-cols-2 gap-2 ${!src.useDate?'opacity-50 pointer-events-none':''}"><button onclick="window.openFilterDate('adv_dateStart')" class="p-1.5 border rounded text-xs bg-white text-left truncate">${dsDisp}</button><button onclick="window.openFilterDate('adv_dateEnd')" class="p-1.5 border rounded text-xs bg-white text-left truncate">${deDisp}</button></div></div></div><div class="p-3 bg-white border-t flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-2 bg-slate-100 text-slate-600 rounded font-bold text-sm">Cancelar</button><button onclick="window.applyAdvancedFilter()" class="flex-1 py-2 bg-navy text-white rounded font-bold text-sm shadow">Filtrar</button></div></div>`);
         };
         window.updateAdvFilterState = (f, v) => { if (!window.state.tempAdvFilter) window.state.tempAdvFilter = { ...window.state.advancedFilter }; window.state.tempAdvFilter[f] = v; };
         window.applyAdvancedFilter = () => { 
-            window.state.fastFilterLabel = '';
+            window.state.fastFilterLabel = 'Eventos Filtrados por Critérios';
             window.state.advancedFilter = { ...window.state.tempAdvFilter, active: true }; 
             window.state.searchTerm = ''; 
             window.state.selectedDate = null; 
@@ -1036,7 +1040,7 @@
         }
         function renderNavMenu() { 
             if (!window.state.isMenuOpen) return ''; 
-            return `<div class="fixed inset-0 z-50"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="window.closeMenu()"></div><div class="relative w-72 h-full bg-navy text-white flex flex-col shadow-2xl animate-in slide-in"><div class="p-6 border-b border-white/10 flex justify-between bg-[#002855]"><h2 class="text-xl font-bold">Menu</h2><button onclick="window.closeMenu()"><i data-lucide="x"></i></button></div><nav class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">${[{id: 'home', icon: 'calendar', label: 'Início'}, {id: 'types', icon: 'tag', label: 'Tipos de Eventos'}, {id: 'locations', icon: 'map-pin', label: 'Localidades'}, {id: 'attendants', icon: 'users', label: 'Atendentes'}, {id: 'about', icon: 'info', label: 'Sobre'}].map(i => `<button onclick="window.navigateTo('${i.id}')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 gap-3 border-l-4 border-transparent hover:border-orange-custom"><i data-lucide="${i.icon}" class="text-orange-custom"></i><span>${i.label}</span></button>`).join('')}</nav><div class="p-4 border-t border-white/10 bg-[#002244]">${window.state.user ? `<button onclick="window.handleLogout()" class="w-full flex justify-center gap-2 px-4 py-3 bg-red-600/20 text-red-200 rounded-lg font-bold"><i data-lucide="log-out" class="w-4 h-4"></i> Sair</button>` : `<button onclick="window.showLoginModal()" class="w-full flex justify-center gap-2 px-4 py-3 bg-white/10 text-white rounded-lg font-bold"><i data-lucide="lock" class="w-4 h-4"></i> Login</button>`}</div></div></div>`; 
+            return `<div class="fixed inset-0 z-50"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="window.closeMenu()"></div><div class="relative w-72 h-full bg-navy text-white flex flex-col shadow-2xl"><div class="p-6 border-b border-white/10 flex justify-between bg-[#002855]"><h2 class="text-xl font-bold">Menu</h2><button onclick="window.closeMenu()"><i data-lucide="x"></i></button></div><nav class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">${[{id: 'home', icon: 'calendar', label: 'Início'}, {id: 'types', icon: 'tag', label: 'Tipos de Eventos'}, {id: 'locations', icon: 'map-pin', label: 'Localidades'}, {id: 'attendants', icon: 'users', label: 'Atendentes'}, {id: 'about', icon: 'info', label: 'Sobre'}].map(i => `<button onclick="window.navigateTo('${i.id}')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 gap-3 border-l-4 border-transparent hover:border-orange-custom"><i data-lucide="${i.icon}" class="text-orange-custom"></i><span>${i.label}</span></button>`).join('')}</nav><div class="p-4 border-t border-white/10 bg-[#002244]">${window.state.user ? `<button onclick="window.handleLogout()" class="w-full flex justify-center gap-2 px-4 py-3 bg-red-600/20 text-red-200 rounded-lg font-bold"><i data-lucide="log-out" class="w-4 h-4"></i> Sair</button>` : `<button onclick="window.showLoginModal()" class="w-full flex justify-center gap-2 px-4 py-3 bg-white/10 text-white rounded-lg font-bold"><i data-lucide="lock" class="w-4 h-4"></i> Login</button>`}</div></div></div>`; 
         }
         function renderAbout() { 
             const app = document.getElementById('app'); 
@@ -1059,12 +1063,6 @@
             if ('serviceWorker' in navigator) {
                 try {
                     const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
-                    registration.onupdatefound = () => {
-                        const installingWorker = registration.installing;
-                        installingWorker.onstatechange = () => {
-                            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) console.log('Novo conteúdo disponível; por favor atualize.');
-                        };
-                    };
                 } catch (e) { console.warn('Registro de SW falhou:', e); }
             }
         }
@@ -1090,7 +1088,7 @@
 
         window.showDuplicateWarning = (text, onLocate, onBackToEdit) => {
             window.showModal(`
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in border-t-4 border-orange-custom">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 border-t-4 border-orange-custom">
                     <h3 class="text-lg font-bold text-navy mb-2 flex items-center gap-2"><i data-lucide="copy" class="text-orange-custom"></i> Registro Duplicado</h3>
                     <p class="text-slate-600 mb-6 text-sm font-medium leading-relaxed">${text}</p>
                     <div class="flex flex-col gap-2">
