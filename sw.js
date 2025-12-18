@@ -1,45 +1,33 @@
-const CACHE_NAME = 'adm-valente-v58';
-
-// Arquivos vitais para o app funcionar offline
-// NOTA: As URLs aqui DEVEM ser idênticas às usadas no index.html e Import Map
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'adm-valente-v1';
+const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  // Ícones
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/apple-touch-icon.png',
-  // Bibliotecas CSS e Fontes
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap',
-  // Lucide Icons
   'https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js',
-  // Bibliotecas PDF
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
-  // Firebase SDK (Compat v9.23.0 for Namespaced API support)
+  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
   'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js'
 ];
 
-self.addEventListener('install', (event) => {
-  self.skipWaiting();
+self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE).catch(err => {
-        console.error("Erro ao cachear assets:", err);
-      });
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(ASSETS);
     })
   );
+  self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
+        cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
             return caches.delete(cacheName);
           }
@@ -47,22 +35,26 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  self.clients.claim();
+  return self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  // Permitir firestore googleapis passarem direto
-  if (event.request.url.includes('firestore.googleapis.com')) return;
-  if (event.request.url.includes('googleapis.com/auth')) return;
-
+self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).catch(() => {
-        // Fallback silencioso se offline
+    caches.match(event.request).then(response => {
+      if (response) return response;
+      return fetch(event.request).then(networkResponse => {
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
+        }
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, responseToCache);
+        });
+        return networkResponse;
+      }).catch(() => {
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
       });
     })
   );
