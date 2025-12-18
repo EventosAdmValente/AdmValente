@@ -1,13 +1,10 @@
-const CACHE_NAME = 'adm-valente-cache-v2';
+const CACHE_NAME = 'adm-valente-cache-v3';
 
 // Recursos críticos que devem ser cacheados para funcionamento offline
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/apple-touch-icon.png',
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap',
   'https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js',
@@ -19,20 +16,20 @@ const STATIC_ASSETS = [
   'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js'
 ];
 
-// Instalação robusta: não falha se um recurso individual falhar
+// Instalação robusta: não falha se um recurso individual falhar e aceita respostas opacas das CDNs
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async cache => {
-      console.log('Instalando Service Worker e cacheando assets...');
+      console.log('Instalando Service Worker...');
       const promises = STATIC_ASSETS.map(async url => {
         try {
-          // Tentativa de cachear cada recurso individualmente
-          const response = await fetch(url);
-          if (response.ok || response.type === 'opaque') {
+          const response = await fetch(url, { mode: 'no-cors' }); // Garante que CDNs não barrem a requisição
+          // No modo 'no-cors', a resposta é opaca (status 0). Aceitamos status 0 ou 200.
+          if (response.status === 200 || response.status === 0) {
             return cache.put(url, response);
           }
         } catch (e) {
-          console.warn(`Falha ao cachear recurso durante install: ${url}`, e);
+          console.warn(`Falha ao cachear recurso no install: ${url}`, e);
         }
       });
       return Promise.allSettled(promises);
@@ -41,7 +38,7 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// Limpeza de caches antigos
+// Ativação e limpeza de versões antigas
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
@@ -51,46 +48,39 @@ self.addEventListener('activate', event => {
   return self.clients.claim();
 });
 
-// Estratégia de Fetch: Cache-First com Fallback de Rede e Cache Dinâmico
+// Estratégia de Fetch corrigida: Clona o stream e aceita respostas de CDNs
 self.addEventListener('fetch', event => {
-  // Ignorar requisições que não sejam GET
   if (event.request.method !== 'GET') return;
   
-  // Ignorar requisições para o Firestore/Auth (o Firebase gerencia seu próprio offline)
-  if (event.request.url.includes('firestore.googleapis.com') || 
-      event.request.url.includes('identitytoolkit.googleapis.com')) return;
+  // IMPORTANTE: Deixa o Firebase gerenciar seus próprios dados e autenticação
+  // Se o SW tentar cachear estas URLs, ele quebrará a sincronização em tempo real
+  const url = event.request.url;
+  if (url.includes('firestore.googleapis.com') || 
+      url.includes('identitytoolkit.googleapis.com') ||
+      url.includes('firebase-installations.googleapis.com')) {
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then(cachedResponse => {
-      // Se está no cache, retorna imediatamente
-      if (cachedResponse) {
-        // Opcional: Atualiza o cache em background (Stale-While-Revalidate)
-        fetch(event.request).then(networkResponse => {
-           if (networkResponse && networkResponse.ok) {
-             caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse));
-           }
-        }).catch(() => {});
-        
-        return cachedResponse;
-      }
-
-      // Se não está no cache, busca na rede
-      return fetch(event.request).then(networkResponse => {
-        // Valida se a resposta é digna de cache (sucesso ou opaque de CDN)
-        if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
-          const responseToCache = networkResponse.clone();
+      // Cria a promessa de rede para buscar e atualizar o cache
+      const networkFetch = fetch(event.request).then(networkResponse => {
+        // Validação: Aceita 200 (sucesso) ou 0 (opaca/CDN)
+        if (networkResponse && (networkResponse.status === 200 || networkResponse.status === 0)) {
+          const responseToCache = networkResponse.clone(); // CORREÇÃO: Clona para não consumir o stream
           caches.open(CACHE_NAME).then(cache => {
             cache.put(event.request, responseToCache);
           });
         }
         return networkResponse;
-      }).catch(err => {
-        // Fallback para navegação: se a rede falhar e for uma página, retorna o index.html
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html') || caches.match('./');
-        }
-        throw err;
+      }).catch(() => {
+        // Se a rede falhar, o erro é capturado aqui para não quebrar a execução
+        return null; 
       });
+
+      // Retorna o cache se existir, senão espera pela rede
+      // Isso garante que o esqueleto carregue instantaneamente
+      return cachedResponse || networkFetch;
     })
   );
 });
