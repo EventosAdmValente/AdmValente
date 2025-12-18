@@ -101,11 +101,6 @@
             display: flex; flex-direction: column; align-items: center;
         }
     </style>
-    <link rel="manifest" href="./manifest.json">
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
-    <meta name="theme-color" content="#003366">
 </head>
 <body class="h-screen w-full flex flex-col bg-slate-100">
 
@@ -178,7 +173,52 @@
 
         /**
          * ==========================================
-         * 2. STATE MANAGEMENT & UTILS
+         * 2. INDEXEDDB CACHE UTILS
+         * ==========================================
+         */
+        const IDB_CONFIG = { name: 'AgendaValenteCache', version: 1, store: 'appData' };
+
+        async function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(IDB_CONFIG.name, IDB_CONFIG.version);
+                request.onupgradeneeded = e => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(IDB_CONFIG.store)) {
+                        db.createObjectStore(IDB_CONFIG.store);
+                    }
+                };
+                request.onsuccess = e => resolve(e.target.result);
+                request.onerror = e => reject(e.target.error);
+            });
+        }
+
+        async function saveCache(key, val) {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(IDB_CONFIG.store, 'readwrite');
+                // Salva uma cópia serializável para evitar problemas com Proxy
+                tx.objectStore(IDB_CONFIG.store).put(JSON.parse(JSON.stringify(val)), key);
+            } catch (e) {
+                console.warn('Erro ao salvar no IDB:', e);
+            }
+        }
+
+        async function loadCache(key) {
+            try {
+                const db = await openDB();
+                return new Promise(resolve => {
+                    const request = db.transaction(IDB_CONFIG.store).objectStore(IDB_CONFIG.store).get(key);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => resolve(null);
+                });
+            } catch (e) {
+                return null;
+            }
+        }
+
+        /**
+         * ==========================================
+         * 3. STATE MANAGEMENT & UTILS
          * ==========================================
          */
         const defaultAdvancedFilter = {
@@ -219,6 +259,11 @@
                 target[property] = value;
                 
                 if (typeof property === 'string') {
+                    // Cache manual para dados de negócio
+                    if (['events', 'types', 'locations', 'attendants'].includes(property)) {
+                        saveCache(property, value);
+                    }
+
                     const isSilent = ['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm', 'formTempDate', 'formTempTime'].includes(property);
                     
                     if (!isSilent) {
@@ -251,7 +296,7 @@
 
         /**
          * ==========================================
-         * 3. RENDERERS
+         * 4. RENDERERS
          * ==========================================
          */
         function renderApp() {
@@ -361,7 +406,7 @@
 
         /**
          * ==========================================
-         * 4. RELATÓRIOS & PREVIEW
+         * 5. RELATÓRIOS & PREVIEW
          * ==========================================
          */
         window.adjustReportScale = () => {
@@ -492,7 +537,7 @@
 
         /**
          * ==========================================
-         * 5. GESTORES GENÉRICOS (TIPOS, LOCAIS, ETC)
+         * 6. GESTORES GENÉRICOS (TIPOS, LOCAIS, ETC)
          * ==========================================
          */
         function renderGenericManager(title, collectionKey, nameLabel, hasSigla) { 
@@ -558,7 +603,7 @@
 
         /**
          * ==========================================
-         * 6. FORMULÁRIO DE EVENTO
+         * 7. FORMULÁRIO DE EVENTO
          * ==========================================
          */
         function renderEventForm() {
@@ -636,7 +681,7 @@
 
         /**
          * ==========================================
-         * 7. NAVEGAÇÃO E MODAIS GERAIS
+         * 8. NAVEGAÇÃO E MODAIS GERAIS
          * ==========================================
          */
         window.navigateTo = (screen, push = true) => { 
@@ -696,7 +741,7 @@
 
         /**
          * ==========================================
-         * 8. LOGICA DE NEGÓCIO (SALVAR, FILTRAR)
+         * 9. LOGICA DE NEGÓCIO (SALVAR, FILTRAR)
          * ==========================================
          */
         window.saveEvent = async () => { 
@@ -797,7 +842,7 @@
 
         /**
          * ==========================================
-         * 9. AGENDA & FILTROS AVANÇADOS
+         * 10. AGENDA & FILTROS AVANÇADOS
          * ==========================================
          */
         window.startOpenAgenda = () => { window.state.pickerTarget = null; window.state.viewDate = new Date(); window.openAgendaModal(); };
@@ -941,7 +986,7 @@
 
         /**
          * ==========================================
-         * 10. FILTRAGEM FINAL E INIT
+         * 11. FILTRAGEM FINAL E INIT
          * ==========================================
          */
         function getFilteredEvents() {
@@ -1031,7 +1076,6 @@
 
         // Handle browser back button and mobile physical back button
         window.addEventListener('popstate', (event) => {
-            // Close overlays first if they are open
             if (window.state.isMenuOpen) {
                 window.state.isMenuOpen = false;
                 return;
@@ -1043,7 +1087,6 @@
                 return;
             }
 
-            // Sync screen state with history entry
             if (event.state && event.state.screen) {
                 window.state.currentScreen = event.state.screen;
                 if (event.state.screen === 'home') {
@@ -1055,9 +1098,20 @@
         });
 
         (async function init() {
+            // Registro de Service Worker para offline assets
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js').catch(() => {});
+            }
+
+            // Tenta carregar cache do IndexedDB antes de qualquer coisa para rapidez visual
+            const cachedCollections = ['events', 'types', 'locations', 'attendants'];
+            for (const key of cachedCollections) {
+                const cached = await loadCache(key);
+                if (cached) window.state[key] = cached;
+            }
+
             await initPersistence();
             
-            // Set initial history state
             history.replaceState({ screen: 'home' }, '', '');
 
             auth.onAuthStateChanged((u) => { 
@@ -1067,9 +1121,13 @@
             
             const collections = ['agenda', 'types', 'locations', 'attendants'];
             const keys = { 'agenda': 'events', 'types': 'types', 'locations': 'locations', 'attendants': 'attendants' };
-            collections.forEach(col => db.collection(col).onSnapshot(snap => { 
-                window.state[keys[col]] = snap.docs.map(d => ({ id: d.id, ...d.data() })); 
-            }));
+            
+            collections.forEach(col => {
+                db.collection(col).onSnapshot(snap => { 
+                    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    window.state[keys[col]] = data; 
+                });
+            });
         })();
     </script>
 </body>
