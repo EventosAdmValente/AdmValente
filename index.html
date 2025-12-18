@@ -178,44 +178,50 @@
 
         /**
          * ==========================================
-         * 2. INDEXEDDB CACHE UTILS
+         * 2. INDEXEDDB CACHE LOGIC
          * ==========================================
          */
-        const IDB_CONFIG = { name: 'AgendaValenteCache', version: 1, store: 'appData' };
+        const DB_NAME = 'AgendaValenteCache';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'appData';
 
-        async function openDB() {
+        async function openCacheDB() {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open(IDB_CONFIG.name, IDB_CONFIG.version);
-                request.onupgradeneeded = e => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
                     const db = e.target.result;
-                    if (!db.objectStoreNames.contains(IDB_CONFIG.store)) {
-                        db.createObjectStore(IDB_CONFIG.store);
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
                     }
                 };
-                request.onsuccess = e => resolve(e.target.result);
-                request.onerror = e => reject(e.target.error);
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = (e) => reject(e.target.error);
             });
         }
 
-        async function saveCache(key, val) {
+        async function saveToCache(key, value) {
             try {
-                const db = await openDB();
-                const tx = db.transaction(IDB_CONFIG.store, 'readwrite');
-                tx.objectStore(IDB_CONFIG.store).put(JSON.parse(JSON.stringify(val)), key);
+                const db = await openCacheDB();
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.put(JSON.parse(JSON.stringify(value)), key);
             } catch (e) {
-                console.warn('Erro ao salvar no IDB:', e);
+                console.warn('Erro ao salvar no cache IndexedDB:', e);
             }
         }
 
-        async function loadCache(key) {
+        async function loadFromCache(key) {
             try {
-                const db = await openDB();
-                return new Promise(resolve => {
-                    const request = db.transaction(IDB_CONFIG.store).objectStore(IDB_CONFIG.store).get(key);
+                const db = await openCacheDB();
+                return new Promise((resolve) => {
+                    const tx = db.transaction(STORE_NAME, 'readonly');
+                    const store = tx.objectStore(STORE_NAME);
+                    const request = store.get(key);
                     request.onsuccess = () => resolve(request.result);
                     request.onerror = () => resolve(null);
                 });
             } catch (e) {
+                console.warn('Erro ao carregar do cache IndexedDB:', e);
                 return null;
             }
         }
@@ -257,12 +263,17 @@
         window.state = new Proxy(INITIAL_STATE, {
             set(target, property, value) {
                 if (target[property] === value) return true;
+                
                 target[property] = value;
+                
                 if (typeof property === 'string') {
+                    // Cache collections to IndexedDB
                     if (['events', 'types', 'locations', 'attendants'].includes(property)) {
-                        saveCache(property, value);
+                        saveToCache(property, value);
                     }
+
                     const isSilent = ['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm', 'formTempDate', 'formTempTime'].includes(property);
+                    
                     if (!isSilent) {
                         scheduleRender();
                     } else { 
@@ -299,6 +310,7 @@
         function renderApp() {
             if (document.getElementById('calendar-modal-content')) return; 
             if (document.getElementById('advanced-filter-modal')) return;
+            
             switch (window.state.currentScreen) {
                 case 'home': renderHome(); break; 
                 case 'event-form': renderEventForm(); break; 
@@ -533,7 +545,7 @@
 
         /**
          * ==========================================
-         * 6. GESTORES GENÉRICOS (TIPOS, LOCAIS, ETC)
+         * 5. GESTORES GENÉRICOS (TIPOS, LOCAIS, ETC)
          * ==========================================
          */
         function renderGenericManager(title, collectionKey, nameLabel, hasSigla) { 
@@ -544,6 +556,7 @@
                 if (collectionKey === 'types') iconName = 'tag';
                 if (collectionKey === 'locations') iconName = 'map-pin';
                 if (collectionKey === 'attendants') iconName = 'user';
+
                 appElement.innerHTML = `
                     <div class="flex flex-col h-screen bg-slate-100">
                         <div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10 flex-shrink-0">
@@ -598,7 +611,7 @@
 
         /**
          * ==========================================
-         * 7. FORMULÁRIO DE EVENTO
+         * 6. FORMULÁRIO DE EVENTO
          * ==========================================
          */
         function renderEventForm() {
@@ -608,13 +621,16 @@
             const isEditing = !!window.state.editingEventId; 
             const event = isEditing ? window.state.events.find(e => e.id === window.state.editingEventId) : null;
             if (isEditing && !event) { window.navigateTo('home', false); return; }
+
             const dateVal = window.state.formTempDate;
             const timeVal = window.state.formTempTime;
             const dateDisplay = dateVal ? formatDateFull(dateVal) : 'dd/mm/aa';
             const timeDisplay = timeVal || '00:00';
+
             const sortedLocations = [...window.state.locations].sort((a, b) => a.name.localeCompare(b.name));
             const sortedTypes = [...window.state.types].sort((a, b) => a.name.localeCompare(b.name));
             const sortedAttendants = [...window.state.attendants].sort((a, b) => a.name.localeCompare(b.name));
+
             const div = document.createElement('div'); 
             div.className = "flex flex-col h-screen bg-slate-100"; 
             div.id = "event-form-container";
@@ -673,7 +689,7 @@
 
         /**
          * ==========================================
-         * 8. NAVEGAÇÃO E MODAIS GERAIS
+         * 7. NAVEGAÇÃO E MODAIS GERAIS
          * ==========================================
          */
         window.navigateTo = (screen, push = true) => { 
@@ -690,6 +706,7 @@
             window.state.tempSigla = ''; 
             window.state.managerSearchTerm = '';
         };
+
         window.openMenu = () => { window.state.isMenuOpen = true; };
         window.closeMenu = () => { window.state.isMenuOpen = false; };
         window.closeModal = () => { 
@@ -698,7 +715,9 @@
             c.classList.add('hidden'); c.innerHTML = ''; 
         };
         window.showModal = (html) => { const c = document.getElementById('modal-container'); c.innerHTML = html; c.classList.remove('hidden'); window.renderIcons(); };
+
         window.handleLogout = async () => { await auth.signOut(); window.state.isMenuOpen = false; };
+        
         window.showLoginModal = () => { 
             window.state.isMenuOpen = false; 
             const t = document.getElementById('login-modal-template'); 
@@ -721,15 +740,16 @@
                 }
             } 
         };
+
         window.showConfirmationModal = (text, onConfirm) => {
-            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in"><h3 class="text-lg font-bold text-navy mb-2 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-500"></i> Confirmação</h3><p class="text-slate-600 mb-6 font-medium">${text}</p><div class="flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Não</button><button id="confirm-action-btn" class="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold shadow-lg hover:bg-red-700">Sim, Excluir</button></div></div>`);
+            window.showModal(`<div class="bg-white rounded-xl shadow-2xl w-full max-sm p-6 animate-in fade-in zoom-in"><h3 class="text-lg font-bold text-navy mb-2 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-500"></i> Confirmação</h3><p class="text-slate-600 mb-6 font-medium">${text}</p><div class="flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">Não</button><button id="confirm-action-btn" class="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold shadow-lg hover:bg-red-700">Sim, Excluir</button></div></div>`);
             const btn = document.getElementById('confirm-action-btn');
             if (btn) btn.onclick = () => { onConfirm(); window.closeModal(); };
         };
 
         /**
          * ==========================================
-         * 9. LOGICA DE NEGÓCIO (SALVAR, FILTRAR)
+         * 8. LOGICA DE NEGÓCIO (SALVAR, FILTRAR)
          * ==========================================
          */
         window.saveEvent = async () => { 
@@ -737,21 +757,26 @@
             const btnTime = document.getElementById('btnTime');
             const evtLoc = document.getElementById('evtLoc');
             const evtType = document.getElementById('evtType');
+
+            // Limpa avisos anteriores
             btnDate?.classList.remove('input-error');
             btnTime?.classList.remove('input-error');
             evtLoc?.classList.remove('input-error');
             evtType?.classList.remove('input-error');
+
             const date = window.state.formTempDate;
             const time = window.state.formTempTime;
             const locationId = evtLoc ? evtLoc.value : '';
             const typeId = evtType ? evtType.value : '';
             const attendantId = document.getElementById('evtAtt')?.value || "";
+
             let isValid = true;
             if (!date) { btnDate?.classList.add('input-error'); isValid = false; }
             if (!time) { btnTime?.classList.add('input-error'); isValid = false; }
             if (!locationId) { evtLoc?.classList.add('input-error'); isValid = false; }
             if (!typeId) { evtType?.classList.add('input-error'); isValid = false; }
             if (!isValid) return;
+
             try { 
                 const payload = { date, time, locationId, typeId, attendantId: attendantId || "" };
                 if (window.state.editingEventId) await db.collection("agenda").doc(window.state.editingEventId).update(payload);
@@ -759,6 +784,7 @@
                 window.state.editingEventId = null; window.resetAllFilters(); window.navigateTo('home'); 
             } catch(e) { alert('Erro ao salvar.'); }
         };
+
         window.deleteEvent = async () => {
             const id = window.state.editingEventId;
             if (!id) return;
@@ -767,6 +793,7 @@
                 catch (e) { alert("Erro ao excluir: " + e.message); }
             });
         };
+
         window.saveGenericRow = async (id, hasSiglaStr) => {
             const hasSigla = String(hasSiglaStr) === 'true';
             const collKey = window.getCollectionKeyByScreen(window.state.currentScreen);
@@ -780,12 +807,15 @@
                 window.cancelGenericEdit();
             } catch (err) { alert("Erro ao salvar."); }
         };
+
         window.requestDeleteRow = async (id, coll, name) => {
             window.showConfirmationModal(`Deseja realmente excluir "${name}"?`, async () => {
                 try { await db.collection(coll).doc(id).delete(); } catch (e) { alert("Erro ao excluir."); }
             });
         };
+
         window.getCollectionKeyByScreen = (s) => (s === 'types' ? 'types' : s === 'locations' ? 'locations' : s === 'attendants' ? 'attendants' : '');
+        
         window.startCreateRow = () => { 
             window.state.isCreatingRow = true; 
             window.state.editingRowId = null; 
@@ -796,6 +826,7 @@
             const hasSigla = window.state.currentScreen === 'types';
             window.showModal(renderInlineRow(null, title, hasSigla, true));
         };
+        
         window.startEditRow = (id) => {
             const key = window.getCollectionKeyByScreen(window.state.currentScreen);
             const item = window.state[key].find(i => i.id === id);
@@ -810,6 +841,7 @@
                 window.showModal(renderInlineRow(item, title, hasSigla, false));
             }
         };
+        
         window.cancelGenericEdit = () => { 
             window.state.isCreatingRow = false; 
             window.state.editingRowId = null; 
@@ -818,7 +850,7 @@
 
         /**
          * ==========================================
-         * 10. AGENDA & FILTROS AVANÇADOS
+         * 9. AGENDA & FILTROS AVANÇADOS
          * ==========================================
          */
         window.startOpenAgenda = () => { window.state.pickerTarget = null; window.state.viewDate = new Date(); window.openAgendaModal(); };
@@ -831,6 +863,7 @@
             window.state.isViewAll = true; 
         };
         window.openEditEvent = (id) => { const e = window.state.events.find(ev => ev.id === id); if(e) { window.state.editingEventId = id; window.state.formTempDate = e.date; window.state.formTempTime = e.time; window.navigateTo('event-form'); } };
+
         window.openAgendaModal = () => {
             const year = window.state.viewDate.getFullYear(); const month = window.state.viewDate.getMonth(); const daysInMonth = new Date(year, month + 1, 0).getDate(); const firstDay = new Date(year, month, 1).getDay();
             let calendarHtml = '';
@@ -845,9 +878,12 @@
                 }
                 calendarHtml += `<button onclick="window.toggleDateSelection('${dateStr}')" class="aspect-square flex flex-col items-center justify-start pt-1.5 rounded-lg border ${isSelected ? 'bg-navy text-white shadow-md border-navy scale-105 z-10' : 'hover:bg-slate-200/60 border-transparent'} ${isToday && !isSelected ? 'bg-blue-50/50 font-bold border-blue-200' : ''}"><span class="text-xs sm:text-sm leading-none mb-1">${day}</span><div class="flex gap-0.5 justify-center flex-wrap px-0.5 w-full">${dotsHtml}</div></button>`;
             }
+            
             const dayEvents = window.state.events.filter(e => e.date === window.state.selectedDate).sort((a, b) => a.time.localeCompare(b.time));
+
             window.showModal(`<div id="calendar-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-4 flex flex-col max-h-[90vh]"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-navy flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5"></i> Agenda</h3><button onclick="window.closeModal()" class="text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button></div><div class="overflow-y-auto flex-1"> <div class="flex justify-between items-center mb-4 gap-2 bg-slate-50 p-2 rounded-lg"><button onclick="window.changeMonth(-1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-left" class="w-5 h-5"></i></button><div class="flex gap-2 items-center flex-1 justify-center"><select onchange="window.changeViewDate()" id="monthSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${monthNames.map((m, i) => `<option value="${i}" ${i === window.state.viewDate.getMonth() ? 'selected' : ''}>${m}</option>`).join('')}</select><select onchange="window.changeViewDate()" id="yearSelect" class="p-1 rounded bg-transparent font-bold text-navy text-center appearance-none">${Array.from({length: 10}, (_, i) => new Date().getFullYear() - 5 + i).map(y => `<option value="${y}" ${y === window.state.viewDate.getFullYear() ? 'selected' : ''}>${y}</option>`).join('')}</select></div><button onclick="window.changeMonth(1)" class="p-1.5 hover:bg-slate-200/50 rounded-full"><i data-lucide="chevron-right" class="w-5 h-5"></i></button></div><div class="grid grid-cols-7 gap-1 text-center text-xs font-black text-slate-400 mb-2"><div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div></div><div class="grid grid-cols-7 gap-1 sm:gap-2 mb-2">${calendarHtml}</div> ${!window.state.pickerTarget && window.state.selectedDate ? `<div class="border-t pt-3 mt-2 flex-1 min-h-0 flex flex-col"><div class="text-xs font-bold text-slate-500 uppercase mb-2">Eventos: ${formatDate(window.state.selectedDate)}</div><div class="flex flex-col overflow-y-auto max-h-[220px] border border-slate-200 rounded-lg overflow-hidden">${dayEvents.map(e => { const type = window.state.types.find(t => t.id === e.typeId); const siglaHtml = type?.sigla ? `<span class="px-1.5 py-0.5 rounded bg-navy text-white text-[9px] font-black uppercase">${type.sigla}</span>` : ''; return `<div class="bg-slate-50 border-b border-slate-200 p-2 flex flex-col gap-0.5 last:border-b-0"><div class="flex items-center justify-between"><span class="font-black text-navy text-[10px]">${e.time}</span>${siglaHtml}</div><div class="font-bold text-slate-800 text-[11px] leading-tight">${type?.name || 'Evento'}</div></div>`; }).join('') || '<div class="text-center text-slate-400 text-xs italic py-4">Nada agendado para este dia.</div>'}</div></div>` : ''} </div> ${!window.state.pickerTarget ? `<div class="mt-4 pt-3 border-t"><button onclick="window.closeModal(); scheduleRender()" class="w-full py-3 bg-navy text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-navy-dark transition-colors"><i data-lucide="list" class="w-4 h-4"></i> Ver Lista</button></div>` : ''}</div>`);
         };
+
         window.toggleDateSelection = (d) => { 
             if (window.state.pickerTarget) { 
                 if (window.state.pickerTarget.startsWith('TEMP_')) {
@@ -864,8 +900,19 @@
             if(window.state.selectedDate) { window.state.advancedFilter = { ...window.state.advancedFilter, active: false }; window.state.searchTerm = ''; }
             window.openAgendaModal(); 
         };
-        window.changeMonth = (d) => { window.state.selectedDate = null; window.state.viewDate = new Date(window.state.viewDate.getFullYear(), window.state.viewDate.getMonth() + d, 1); window.openAgendaModal(); };
-        window.changeViewDate = () => { window.state.selectedDate = null; window.state.viewDate = new Date(parseInt(document.getElementById('yearSelect').value), parseInt(document.getElementById('monthSelect').value), 1); window.openAgendaModal(); };
+
+        window.changeMonth = (d) => { 
+            window.state.selectedDate = null;
+            window.state.viewDate = new Date(window.state.viewDate.getFullYear(), window.state.viewDate.getMonth() + d, 1); 
+            window.openAgendaModal(); 
+        };
+        
+        window.changeViewDate = () => { 
+            window.state.selectedDate = null;
+            window.state.viewDate = new Date(parseInt(document.getElementById('yearSelect').value), parseInt(document.getElementById('monthSelect').value), 1); 
+            window.openAgendaModal(); 
+        };
+
         window.openTimePickerModal = (target) => {
             window.state.timePickerTarget = target;
             const hours = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'));
@@ -889,11 +936,14 @@
             const sortedSiglas = window.state.types.filter(t => t.sigla).sort((a, b) => (a.sigla || '').localeCompare(b.sigla || ''));
             const sortedLocations = [...window.state.locations].sort((a, b) => a.name.localeCompare(b.name));
             const sortedAttendants = [...window.state.attendants].sort((a, b) => a.name.localeCompare(b.name));
+
             const typeOpts = `<option value="">Selecione...</option>` + sortedTypes.map(t => `<option value="${t.id}" ${t.id === src.valType ? 'selected' : ''}>${t.name}</option>`).join('');
             const sigOpts = `<option value="">Selecione...</option>` + sortedSiglas.map(t => `<option value="${t.id}" ${t.id === src.valSigla ? 'selected' : ''}>${t.sigla}</option>`).join('');
             const locOpts = `<option value="">Selecione...</option>` + sortedLocations.map(l => `<option value="${l.id}" ${l.id === src.valLoc ? 'selected' : ''}>${l.name}</option>`).join('');
             const attOpts = `<option value="">Selecione...</option>` + sortedAttendants.map(a => `<option value="${a.id}" ${a.id === src.valAtt ? 'selected' : ''}>${a.name}</option>`).join('');
+            
             const dsDisp = src.dateStart ? formatDateFull(src.dateStart) : 'Selecione...'; const deDisp = src.dateEnd ? formatDateFull(src.dateEnd) : 'Selecione...';
+
             window.showModal(`
                 <div id="advanced-filter-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-md p-0 overflow-hidden flex flex-col max-h-[90vh]">
                     <div class="p-3 border-b border-slate-100 flex justify-between items-center bg-navy text-white">
@@ -936,6 +986,7 @@
                 </div>
             `);
         };
+
         window.updateAdvFilterState = (f, v) => { if (!window.state.tempAdvFilter) window.state.tempAdvFilter = { ...window.state.advancedFilter }; window.state.tempAdvFilter[f] = v; };
         window.applyAdvancedFilter = () => { window.state.advancedFilter = { ...window.state.tempAdvFilter, active: true }; window.state.searchTerm = ''; window.state.selectedDate = null; window.closeModal(); };
         window.openFilterDate = (f) => { window.state.pickerTarget = `TEMP_${f}`; window.openAgendaModal(); };
@@ -979,10 +1030,12 @@
             if (window.state.selectedDate) return `Eventos do dia: ${formatDate(window.state.selectedDate)}`;
             return "Todos os Eventos";
         }
+
         function renderNavMenu() { 
             if (!window.state.isMenuOpen) return ''; 
             return `<div class="fixed inset-0 z-50"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="window.closeMenu()"></div><div class="relative w-72 h-full bg-navy text-white flex flex-col shadow-2xl animate-in slide-in"><div class="p-6 border-b border-white/10 flex justify-between bg-[#002855]"><h2 class="text-xl font-bold">Menu</h2><button onclick="window.closeMenu()"><i data-lucide="x"></i></button></div><nav class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">${[{id: 'home', icon: 'calendar', label: 'Início'}, {id: 'types', icon: 'tag', label: 'Tipos de Eventos'}, {id: 'locations', icon: 'map-pin', label: 'Locais'}, {id: 'attendants', icon: 'users', label: 'Atendentes'}, {id: 'about', icon: 'info', label: 'Sobre'}].map(i => `<button onclick="window.navigateTo('${i.id}')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 gap-3 border-l-4 border-transparent hover:border-orange-custom"><i data-lucide="${i.icon}" class="text-orange-custom"></i><span>${i.label}</span></button>`).join('')}</nav><div class="p-4 border-t border-white/10 bg-[#002244]">${window.state.user ? `<button onclick="window.handleLogout()" class="w-full flex justify-center gap-2 px-4 py-3 bg-red-600/20 text-red-200 rounded-lg font-bold"><i data-lucide="log-out" class="w-4 h-4"></i> Sair</button>` : `<button onclick="window.showLoginModal()" class="w-full flex justify-center gap-2 px-4 py-3 bg-white/10 text-white rounded-lg font-bold"><i data-lucide="lock" class="w-4 h-4"></i> Login</button>`}</div></div></div>`; 
         }
+
         function renderAbout() { 
             const app = document.getElementById('app'); 
             app.innerHTML = `
@@ -995,10 +1048,12 @@
                         <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-2 text-navy shadow-lg border border-slate-200 shrink-0">
                             <i data-lucide="calendar-check-2" class="w-10 h-10"></i>
                         </div>
+                        
                         <div class="text-center">
                             <h2 class="text-2xl font-black text-navy mb-1">Eventos Adm Valente</h2>
                             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Gerenciador de Agenda Administrativa</p>
                         </div>
+
                         <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                             <h3 class="font-bold text-navy mb-3 flex items-center gap-2"><i data-lucide="zap" class="w-4 h-4 text-orange-custom"></i> Funcionalidades</h3>
                             <ul class="text-xs sm:text-sm space-y-3 text-slate-600">
@@ -1010,11 +1065,13 @@
                                 <li class="flex items-start gap-3"><i data-lucide="shield-check" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Segurança avançada com controle administrativo autenticado.</span></li>
                             </ul>
                         </div>
+
                         <div class="bg-blue-50 p-5 rounded-2xl border border-blue-100">
                             <h3 class="font-bold text-navy mb-2 flex items-center gap-2 text-sm uppercase tracking-wide"><i data-lucide="code" class="w-4 h-4"></i> Créditos</h3>
                             <p class="text-xs text-slate-700">Sistema idealizado e desenvolvido por:</p>
                             <p class="text-lg font-black text-navy mt-1">Marcos de Lima</p>
                         </div>
+
                         <div class="text-center pt-4">
                             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Versão 2.1.0</p>
                             <p class="text-[9px] text-slate-300 font-medium">© 2024 Adm Valente - Todos os direitos reservados</p>
@@ -1024,7 +1081,10 @@
         }
 
         window.startCreateEvent = () => { window.state.editingEventId = null; window.state.formTempDate = new Date().toISOString().split('T')[0]; window.state.formTempTime = '08:00'; window.navigateTo('event-form'); };
+
+        // Handle browser back button and mobile physical back button
         window.addEventListener('popstate', (event) => {
+            // Close overlays first if they are open
             if (window.state.isMenuOpen) {
                 window.state.isMenuOpen = false;
                 return;
@@ -1035,6 +1095,8 @@
                 scheduleRender();
                 return;
             }
+
+            // Sync screen state with history entry
             if (event.state && event.state.screen) {
                 window.state.currentScreen = event.state.screen;
                 if (event.state.screen === 'home') {
@@ -1044,29 +1106,92 @@
                 window.state.currentScreen = 'home';
             }
         });
-        (async function init() {
+
+        /**
+         * ==========================================
+         * 12. SERVICE WORKER REGISTRATION (INLINE)
+         * ==========================================
+         */
+        async function registerInlineSW() {
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('./sw.js').catch(() => {});
+                const swScript = `
+                    const CACHE_NAME = 'adm-valente-v1';
+                    const ASSETS = [
+                        './',
+                        './index.html',
+                        './manifest.json',
+                        'https://cdn.tailwindcss.com',
+                        'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap',
+                        'https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js',
+                        'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+                        'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
+                        'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+                        'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',
+                        'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js',
+                        'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js'
+                    ];
+
+                    self.addEventListener('install', (event) => {
+                        event.waitUntil(
+                            caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+                        );
+                    });
+
+                    self.addEventListener('fetch', (event) => {
+                        event.respondWith(
+                            caches.match(event.request).then((cachedResponse) => {
+                                if (cachedResponse) return cachedResponse;
+                                return fetch(event.request).catch(() => {
+                                    // Fallback if network fails and no cache
+                                    if (event.request.mode === 'navigate') {
+                                        return caches.match('./index.html');
+                                    }
+                                });
+                            })
+                        );
+                    });
+                `;
+                const blob = new Blob([swScript], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                try {
+                    await navigator.serviceWorker.register(swUrl);
+                    console.log('Service Worker embutido registrado com sucesso.');
+                } catch (e) {
+                    console.error('Falha ao registrar Service Worker embutido:', e);
+                }
             }
-            const cachedCollections = ['events', 'types', 'locations', 'attendants'];
-            for (const key of cachedCollections) {
-                const cached = await loadCache(key);
-                if (cached) window.state[key] = cached;
+        }
+
+        (async function init() {
+            // Step 1: Register Service Worker
+            registerInlineSW();
+
+            // Step 2: Try to load state from IndexedDB cache immediately for instant UI response
+            const collectionsToRestore = ['events', 'types', 'locations', 'attendants'];
+            for (const key of collectionsToRestore) {
+                const cachedData = await loadFromCache(key);
+                if (cachedData) {
+                    window.state[key] = cachedData;
+                }
             }
+
+            // Step 3: Initialize Firebase Persistence
             await initPersistence();
+            
+            // Step 4: Setup history and Auth
             history.replaceState({ screen: 'home' }, '', '');
+
             auth.onAuthStateChanged((u) => { 
                 window.state.user = u; 
                 window.state.isAdmin = u?.uid === ADMIN_UID; 
             });
+            
+            // Step 5: Start listening for real-time updates (will also work offline via persistence)
             const collections = ['agenda', 'types', 'locations', 'attendants'];
             const keys = { 'agenda': 'events', 'types': 'types', 'locations': 'locations', 'attendants': 'attendants' };
-            collections.forEach(col => {
-                db.collection(col).onSnapshot(snap => { 
-                    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    window.state[keys[col]] = data; 
-                });
-            });
+            collections.forEach(col => db.collection(col).onSnapshot(snap => { 
+                window.state[keys[col]] = snap.docs.map(d => ({ id: d.id, ...d.data() })); 
+            }));
         })();
     </script>
 </body>
