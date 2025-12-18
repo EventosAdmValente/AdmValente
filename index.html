@@ -553,8 +553,8 @@
             const event = isEditing ? window.state.events.find(e => e.id === window.state.editingEventId) : null;
             if (isEditing && !event) { window.navigateTo('home'); return; }
 
-            const dateVal = window.state.formTempDate || (event?.date || '');
-            const timeVal = window.state.formTempTime || (event?.time || '');
+            const dateVal = window.state.formTempDate;
+            const timeVal = window.state.formTempTime;
             const dateDisplay = dateVal ? formatDateFull(dateVal) : 'dd/mm/aa';
             const timeDisplay = timeVal || '00:00';
 
@@ -623,11 +623,11 @@
          * 7. NAVEGAÇÃO E MODAIS GERAIS
          * ==========================================
          */
-        window.navigateTo = (screen) => { 
+        window.navigateTo = (screen, push = true) => { 
             if (window.state.currentScreen === screen) { window.state.isMenuOpen = false; renderApp(); return; } 
-            history.pushState({ screen: screen }, '', ''); 
+            if (push) history.pushState({ screen: screen }, '', ''); 
             window.state.isMenuOpen = false; window.state.currentScreen = screen; window.state.editingRowId = null; window.state.isCreatingRow = false; 
-            window.state.tempName = ''; window.state.tempSigla = ''; window.state.managerSearchTerm = ''; window.state.formTempDate = ''; window.state.formTempTime = '';
+            window.state.tempName = ''; window.state.tempSigla = ''; window.state.managerSearchTerm = '';
             renderApp(); 
         };
 
@@ -677,17 +677,28 @@
          * ==========================================
          */
         window.saveEvent = async () => { 
+            const btnDate = document.getElementById('btnDate');
+            const btnTime = document.getElementById('btnTime');
+            const evtLoc = document.getElementById('evtLoc');
+            const evtType = document.getElementById('evtType');
+
+            // Limpa avisos anteriores
+            btnDate?.classList.remove('input-error');
+            btnTime?.classList.remove('input-error');
+            evtLoc?.classList.remove('input-error');
+            evtType?.classList.remove('input-error');
+
             const date = window.state.formTempDate;
             const time = window.state.formTempTime;
-            const locationId = document.getElementById('evtLoc').value;
-            const typeId = document.getElementById('evtType').value;
-            const attendantId = document.getElementById('evtAtt').value;
+            const locationId = evtLoc ? evtLoc.value : '';
+            const typeId = evtType ? evtType.value : '';
+            const attendantId = document.getElementById('evtAtt')?.value || "";
 
             let isValid = true;
-            if (!date) { document.getElementById('btnDate')?.classList.add('input-error'); isValid = false; }
-            if (!time) { document.getElementById('btnTime')?.classList.add('input-error'); isValid = false; }
-            if (!locationId) { document.getElementById('evtLoc').classList.add('input-error'); isValid = false; }
-            if (!typeId) { document.getElementById('evtType').classList.add('input-error'); isValid = false; }
+            if (!date) { btnDate?.classList.add('input-error'); isValid = false; }
+            if (!time) { btnTime?.classList.add('input-error'); isValid = false; }
+            if (!locationId) { evtLoc?.classList.add('input-error'); isValid = false; }
+            if (!typeId) { evtType?.classList.add('input-error'); isValid = false; }
             if (!isValid) return;
 
             try { 
@@ -808,8 +819,17 @@
             window.openAgendaModal(); 
         };
 
-        window.changeMonth = (d) => { window.state.viewDate = new Date(window.state.viewDate.getFullYear(), window.state.viewDate.getMonth() + d, 1); window.openAgendaModal(); };
-        window.changeViewDate = () => { window.state.viewDate = new Date(parseInt(document.getElementById('yearSelect').value), parseInt(document.getElementById('monthSelect').value), 1); window.openAgendaModal(); };
+        window.changeMonth = (d) => { 
+            window.state.selectedDate = null;
+            window.state.viewDate = new Date(window.state.viewDate.getFullYear(), window.state.viewDate.getMonth() + d, 1); 
+            window.openAgendaModal(); 
+        };
+        
+        window.changeViewDate = () => { 
+            window.state.selectedDate = null;
+            window.state.viewDate = new Date(parseInt(document.getElementById('yearSelect').value), parseInt(document.getElementById('monthSelect').value), 1); 
+            window.openAgendaModal(); 
+        };
 
         window.openTimePickerModal = (target) => {
             window.state.timePickerTarget = target;
@@ -938,8 +958,42 @@
 
         window.startCreateEvent = () => { window.state.editingEventId = null; window.state.formTempDate = new Date().toISOString().split('T')[0]; window.state.formTempTime = '08:00'; window.navigateTo('event-form'); };
 
+        // Handle browser back button and mobile physical back button
+        window.addEventListener('popstate', (event) => {
+            // Close overlays first if they are open
+            if (window.state.isMenuOpen) {
+                window.state.isMenuOpen = false;
+                renderApp();
+                return;
+            }
+            const modal = document.getElementById('modal-container');
+            if (modal && !modal.classList.contains('hidden')) {
+                window.closeModal();
+                renderApp();
+                return;
+            }
+
+            // Sync screen state with history entry
+            if (event.state && event.state.screen) {
+                window.state.currentScreen = event.state.screen;
+                // If returning from form/manager, reset specific IDs
+                if (event.state.screen === 'home') {
+                    window.state.editingEventId = null;
+                }
+                renderApp();
+            } else {
+                // Default to home if no state
+                window.state.currentScreen = 'home';
+                renderApp();
+            }
+        });
+
         (async function init() {
             await initPersistence();
+            
+            // Set initial history state
+            history.replaceState({ screen: 'home' }, '', '');
+
             auth.onAuthStateChanged((u) => { window.state.user = u; window.state.isAdmin = u?.uid === ADMIN_UID; renderApp(); });
             const collections = ['agenda', 'types', 'locations', 'attendants'];
             const keys = { 'agenda': 'events', 'types': 'types', 'locations': 'locations', 'attendants': 'attendants' };
