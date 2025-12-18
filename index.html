@@ -892,7 +892,7 @@
             const dsDisp = src.dateStart ? formatDateFull(src.dateStart) : 'Selecione...'; const deDisp = src.dateEnd ? formatDateFull(src.dateEnd) : 'Selecione...';
 
             window.showModal(`
-                <div id="advanced-filter-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-md p-0 overflow-hidden flex flex-col max-h-[90vh]">
+                <div id="advanced-filter-modal" class="bg-white rounded-xl shadow-2xl w-full max-md p-0 overflow-hidden flex flex-col max-h-[90vh]">
                     <div class="p-3 border-b border-slate-100 flex justify-between items-center bg-navy text-white">
                         <h3 class="font-bold text-base flex items-center gap-2"><i data-lucide="filter" class="w-4 h-4"></i> Informe os dados para Filtrar</h3>
                         <button onclick="window.closeModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
@@ -983,7 +983,49 @@
             return `<div class="fixed inset-0 z-50"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="window.closeMenu()"></div><div class="relative w-72 h-full bg-navy text-white flex flex-col shadow-2xl animate-in slide-in"><div class="p-6 border-b border-white/10 flex justify-between bg-[#002855]"><h2 class="text-xl font-bold">Menu</h2><button onclick="window.closeMenu()"><i data-lucide="x"></i></button></div><nav class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">${[{id: 'home', icon: 'calendar', label: 'Início'}, {id: 'types', icon: 'tag', label: 'Tipos de Eventos'}, {id: 'locations', icon: 'map-pin', label: 'Locais'}, {id: 'attendants', icon: 'users', label: 'Atendentes'}, {id: 'about', icon: 'info', label: 'Sobre'}].map(i => `<button onclick="window.navigateTo('${i.id}')" class="w-full flex items-center px-6 py-4 hover:bg-white/10 gap-3 border-l-4 border-transparent hover:border-orange-custom"><i data-lucide="${i.icon}" class="text-orange-custom"></i><span>${i.label}</span></button>`).join('')}</nav><div class="p-4 border-t border-white/10 bg-[#002244]">${window.state.user ? `<button onclick="window.handleLogout()" class="w-full flex justify-center gap-2 px-4 py-3 bg-red-600/20 text-red-200 rounded-lg font-bold"><i data-lucide="log-out" class="w-4 h-4"></i> Sair</button>` : `<button onclick="window.showLoginModal()" class="w-full flex justify-center gap-2 px-4 py-3 bg-white/10 text-white rounded-lg font-bold"><i data-lucide="lock" class="w-4 h-4"></i> Login</button>`}</div></div></div>`; 
         }
 
-        function renderAbout() { const app = document.getElementById('app'); app.innerHTML = `<div class="flex flex-col h-screen bg-slate-100"><div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10"><button onclick="window.navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button><h1 class="font-bold uppercase tracking-wide">SOBRE</h1></div><div class="p-6 flex flex-col gap-6 text-center text-slate-600 max-w-md mx-auto"><div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-2 text-navy shadow-md"><i data-lucide="calendar-check-2" class="w-12 h-12"></i></div><div><h2 class="text-2xl font-bold text-navy mb-4">Adm Valente</h2><p class="mb-4 text-slate-700">Sistema de gerenciamento de eventos com persistência Firestore e controle administrativo.</p><div class="mt-8 text-xs text-slate-400">Versão 2.0.0</div></div></div></div>`; }
+        function renderAbout() { 
+            const app = document.getElementById('app'); 
+            app.innerHTML = `
+                <div class="flex flex-col h-screen bg-slate-100">
+                    <div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10 shrink-0">
+                        <button onclick="window.navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button>
+                        <h1 class="font-bold uppercase tracking-wide">Sobre o App</h1>
+                    </div>
+                    <div class="p-6 flex flex-col gap-6 text-slate-600 max-w-lg mx-auto overflow-y-auto pb-10">
+                        <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-2 text-navy shadow-lg border border-slate-200 shrink-0">
+                            <i data-lucide="calendar-check-2" class="w-10 h-10"></i>
+                        </div>
+                        
+                        <div class="text-center">
+                            <h2 class="text-2xl font-black text-navy mb-1">Eventos Adm Valente</h2>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Gerenciador de Agenda Administrativa</p>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                            <h3 class="font-bold text-navy mb-3 flex items-center gap-2"><i data-lucide="zap" class="w-4 h-4 text-orange-custom"></i> Funcionalidades</h3>
+                            <ul class="text-xs sm:text-sm space-y-3 text-slate-600">
+                                <li class="flex items-start gap-3"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Gestão completa de eventos com categorias, locais e atendentes.</span></li>
+                                <li class="flex items-start gap-3"><i data-lucide="calendar" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Agenda interativa com visualização mensal e diária.</span></li>
+                                <li class="flex items-start gap-3"><i data-lucide="filter" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Filtros avançados para buscas precisas por múltiplos critérios.</span></li>
+                                <li class="flex items-start gap-3"><i data-lucide="file-text" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Exportação de relatórios profissionais em formatos PDF e PNG.</span></li>
+                                <li class="flex items-start gap-3"><i data-lucide="refresh-cw" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Sincronização em tempo real e suporte robusto para uso offline.</span></li>
+                                <li class="flex items-start gap-3"><i data-lucide="shield-check" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Segurança avançada com controle administrativo autenticado.</span></li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-blue-50 p-5 rounded-2xl border border-blue-100">
+                            <h3 class="font-bold text-navy mb-2 flex items-center gap-2 text-sm uppercase tracking-wide"><i data-lucide="code" class="w-4 h-4"></i> Créditos</h3>
+                            <p class="text-xs text-slate-700">Sistema idealizado e desenvolvido por:</p>
+                            <p class="text-lg font-black text-navy mt-1">Marcos de Lima</p>
+                        </div>
+
+                        <div class="text-center pt-4">
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Versão 2.1.0</p>
+                            <p class="text-[9px] text-slate-300 font-medium">© 2024 Adm Valente - Todos os direitos reservados</p>
+                        </div>
+                    </div>
+                </div>`; 
+        }
 
         window.startCreateEvent = () => { window.state.editingEventId = null; window.state.formTempDate = new Date().toISOString().split('T')[0]; window.state.formTempTime = '08:00'; window.navigateTo('event-form'); };
 
