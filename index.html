@@ -169,10 +169,15 @@
 
         async function initPersistence() {
             try {
+                // Configuração robusta para evitar conflitos de tabs no mobile
                 await db.enablePersistence({ synchronizeTabs: true });
                 console.log("Persistência offline ativada.");
             } catch (err) {
-                console.warn("Persistência falhou:", err.code);
+                if (err.code === 'failed-precondition') {
+                    console.warn("Múltiplas abas abertas, persistência em apenas uma.");
+                } else if (err.code === 'unimplemented') {
+                    console.warn("Navegador não suporta persistência.");
+                }
             }
         }
 
@@ -884,7 +889,7 @@
         window.confirmTimeSelection = () => { window.state.formTempTime = `${window.tempTimeH}:${window.tempTimeM}`; window.closeModal(); };
 
         window.openAdvancedFilterModal = (restore = false) => {
-            const src = restore && window.state.tempAdvFilter ? window.state.tempAdvFilter : window.state.advancedFilter; window.state.tempAdvFilter = { ...src };
+            const src = restore && window.state.tempAdvFilter ? window.state.advancedFilter : window.state.advancedFilter; window.state.tempAdvFilter = { ...src };
             const sortedTypes = [...window.state.types].sort((a, b) => a.name.localeCompare(b.name));
             const sortedSiglas = window.state.types.filter(t => t.sigla).sort((a, b) => (a.sigla || '').localeCompare(b.sigla || ''));
             const sortedLocations = [...window.state.locations].sort((a, b) => a.name.localeCompare(b.name));
