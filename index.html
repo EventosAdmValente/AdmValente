@@ -33,7 +33,7 @@
         input:focus, select:focus, textarea:focus { outline: none; }
         input:-webkit-autofill { -webkit-box-shadow: 0 0 0 30px white inset !important; }
         .disabled-area { opacity: 0.5; pointer-events: none; filter: grayscale(1); }
-        .input-error { border-color: #ef4444 !important; background-color: #fef2f2 !important; }
+        .input-error { border-color: #ef4444 !important; background-color: #fef2f2 !important; border-width: 2px !important; }
 
         .loading-container {
             display: flex;
@@ -231,8 +231,9 @@
             searchTerm: '', filterStartDate: '', filterEndDate: '',
             advancedFilter: defaultAdvancedFilter,
             tempAdvFilter: null, pickerTarget: null, timePickerTarget: null, selectedDate: null, viewDate: new Date(),
-            editingRowId: null, isCreatingRow: false, tempName: '', tempSigla: '', managerSearchTerm: '',
-            formTempDate: '', formTempTime: '', highlightedId: null, fastFilterLabel: ''
+            editingRowId: null, isCreatingRow: false, tempName: '', tempSigla: '', tempExtra: '', managerSearchTerm: '',
+            formTempDate: '', formTempTime: '', formTempLoc: '', formTempType: '', formTempAtt: '',
+            highlightedId: null, fastFilterLabel: ''
         };
 
         let renderTimer = null;
@@ -250,7 +251,7 @@
                 target[property] = value;
                 if (typeof property === 'string') {
                     if (['events', 'types', 'locations', 'attendants'].includes(property)) saveCache(property, value);
-                    const isSilent = ['tempName', 'tempSigla', 'managerSearchTerm', 'searchTerm', 'formTempDate', 'formTempTime', 'highlightedId', 'fastFilterLabel'].includes(property);
+                    const isSilent = ['tempName', 'tempSigla', 'tempExtra', 'managerSearchTerm', 'searchTerm', 'formTempDate', 'formTempTime', 'formTempLoc', 'formTempType', 'formTempAtt', 'highlightedId', 'fastFilterLabel'].includes(property);
                     if (!isSilent) scheduleRender();
                     else { 
                         if (property === 'searchTerm') { 
@@ -265,7 +266,7 @@
                         }
                         if (property === 'managerSearchTerm') scheduleRender(); 
                         if (property === 'highlightedId') scheduleRender();
-                        if (property === 'formTempDate' || property === 'formTempTime') {
+                        if (['formTempDate', 'formTempTime', 'formTempLoc', 'formTempType', 'formTempAtt'].includes(property)) {
                              if (target.currentScreen === 'event-form') scheduleRender();
                         }
                     }
@@ -550,6 +551,9 @@
                             <input id="managerSearch" type="text" placeholder="Buscar..." class="w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-navy/20" value="${window.state.managerSearchTerm}">
                             <i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
                         </div>
+                        <div class="flex justify-end items-center px-1 -mb-3">
+                            <div id="manager-count" class="text-[10px] font-bold text-slate-500 uppercase tracking-widest"></div>
+                        </div>
                         <div id="manager-list-container" class="flex-1 overflow-y-auto border border-slate-200 bg-slate-50 rounded-xl shadow-md min-h-0">
                         </div>
                         ${window.state.isAdmin ? `
@@ -572,6 +576,7 @@
 
         window.updateGenericList = (collectionKey) => {
             const listContainer = document.getElementById('manager-list-container');
+            const countContainer = document.getElementById('manager-count');
             if (!listContainer) return;
 
             const colList = (window.state[collectionKey] || []).sort((a, b) => a.name.localeCompare(b.name));
@@ -582,11 +587,19 @@
             if (collectionKey === 'attendants') iconName = 'user';
 
             const filtered = colList.filter((i)=>i.name.toLowerCase().includes(window.state.managerSearchTerm.toLowerCase()));
+            
+            if (countContainer) {
+                countContainer.textContent = `${filtered.length} registros`;
+            }
 
             listContainer.innerHTML = `
                 <ul class="divide-y divide-slate-200/50">
                     ${filtered.map((i) => {
                         const isHighlighted = window.state.highlightedId === i.id;
+                        let extraInfo = '';
+                        if (collectionKey === 'locations' && i.Cidade) extraInfo = `<span class="text-[10px] block font-medium text-slate-500 uppercase tracking-tighter">${i.Cidade}</span>`;
+                        if (collectionKey === 'attendants' && i.Ministério) extraInfo = `<span class="text-[10px] block font-medium text-slate-500 uppercase tracking-tighter">${i.Ministério}</span>`;
+
                         return `
                             <li id="item-${i.id}" onclick="window.state.highlightedId = null" class="p-3 border-b border-slate-200/50 last:border-0 bg-white hover:bg-slate-50 transition-colors ${isHighlighted ? 'highlight-item' : ''}">
                                 <div class="flex items-center gap-3">
@@ -595,7 +608,10 @@
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center justify-between gap-2">
-                                            <span class="font-bold text-navy text-sm sm:text-base break-words">${i.name}</span>
+                                            <div class="flex flex-col min-w-0">
+                                                <span class="font-bold text-navy text-sm sm:text-base break-words truncate">${i.name}</span>
+                                                ${extraInfo}
+                                            </div>
                                             ${hasSigla && i.sigla ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 shrink-0 border border-slate-300">${i.sigla}</span>` : ''}
                                         </div>
                                     </div>
@@ -619,7 +635,14 @@
         }
 
         function renderInlineRow(item, lbl, sigla, isNew) { 
-            return `<div id="inline-edit-row" class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200"><h3 class="font-bold text-lg text-navy mb-4 border-b pb-2">${isNew ? 'Adicionar' : 'Editar'} ${lbl}</h3><div class="mb-4"><label class="text-xs font-bold text-navy uppercase block mb-1">${lbl}</label><input id="editNameInput" class="w-full p-3 border border-slate-300 rounded bg-slate-50 focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Nome" value="${isNew ? window.state.tempName : (window.state.tempName || item.name)}" oninput="window.state.tempName=this.value"></div>${sigla ? `<div class="mb-5"><label class="text-xs font-bold text-navy uppercase block mb-1">Sigla</label><input id="editSiglaInput" class="w-full p-3 border border-slate-300 rounded bg-slate-50 uppercase focus:ring-2 focus:ring-blue-200 outline-none" placeholder="SIGLA" maxlength="5" value="${isNew ? window.state.tempSigla : (window.state.tempSigla || item.sigla)}" oninput="window.state.tempSigla=this.value.toUpperCase()"></div>` : ''}<div class="flex gap-3 pt-2"><button onclick="window.cancelGenericEdit()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded font-bold hover:bg-slate-200">Cancelar</button><button onclick="window.saveGenericRow('${isNew?'':item.id}', ${sigla})" class="flex-1 bg-navy text-white py-3 rounded font-bold shadow-lg hover:bg-navy-dark">Salvar</button></div></div>`; 
+            let extraFieldHtml = '';
+            if (window.state.currentScreen === 'locations') {
+                extraFieldHtml = `<div class="mb-4"><label class="text-xs font-bold text-navy uppercase block mb-1">Cidade <span class="text-red-500">*</span></label><input id="editExtraInput" class="w-full p-3 border border-slate-300 rounded bg-slate-50 focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Informe a Cidade" value="${window.state.tempExtra || ''}" oninput="window.state.tempExtra=this.value; this.classList.remove('input-error')"></div>`;
+            } else if (window.state.currentScreen === 'attendants') {
+                extraFieldHtml = `<div class="mb-4"><label class="text-xs font-bold text-navy uppercase block mb-1">Ministério <span class="text-red-500">*</span></label><input id="editExtraInput" class="w-full p-3 border border-slate-300 rounded bg-slate-50 focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Informe o Ministério" value="${window.state.tempExtra || ''}" oninput="window.state.tempExtra=this.value; this.classList.remove('input-error')"></div>`;
+            }
+
+            return `<div id="inline-edit-row" class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200"><h3 class="font-bold text-lg text-navy mb-4 border-b pb-2">${isNew ? 'Adicionar' : 'Editar'} ${lbl}</h3><div class="mb-4"><label class="text-xs font-bold text-navy uppercase block mb-1">${lbl} <span class="text-red-500">*</span></label><input id="editNameInput" class="w-full p-3 border border-slate-300 rounded bg-slate-50 focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Nome" value="${isNew ? window.state.tempName : (window.state.tempName || item.name)}" oninput="window.state.tempName=this.value; this.classList.remove('input-error')"></div>${sigla ? `<div class="mb-5"><label class="text-xs font-bold text-navy uppercase block mb-1">Sigla <span class="text-red-500">*</span></label><input id="editSiglaInput" class="w-full p-3 border border-slate-300 rounded bg-slate-50 uppercase focus:ring-2 focus:ring-blue-200 outline-none" placeholder="SIGLA" maxlength="5" value="${isNew ? window.state.tempSigla : (window.state.tempSigla || item.sigla)}" oninput="window.state.tempSigla=this.value.toUpperCase(); this.classList.remove('input-error')"></div>` : extraFieldHtml}<div class="flex gap-3 pt-2"><button onclick="window.cancelGenericEdit()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded font-bold hover:bg-slate-200">Cancelar</button><button onclick="window.saveGenericRow('${isNew?'':item.id}', ${sigla})" class="flex-1 bg-navy text-white py-3 rounded font-bold shadow-lg hover:bg-navy-dark">Salvar</button></div></div>`; 
         }
 
         /**
@@ -634,13 +657,20 @@
             const isEditing = !!window.state.editingEventId; 
             const event = isEditing ? window.state.events.find(e => e.id === window.state.editingEventId) : null;
             if (isEditing && !event) { window.navigateTo('home', false); return; }
+            
             const dateVal = window.state.formTempDate;
             const timeVal = window.state.formTempTime;
+            const locVal = window.state.formTempLoc;
+            const typeVal = window.state.formTempType;
+            const attVal = window.state.formTempAtt;
+
             const dateDisplay = dateVal ? formatDateFull(dateVal) : 'dd/mm/aa';
             const timeDisplay = timeVal || '00:00';
-            const sortedLocations = [...window.state.locations].sort((a, b) => a.name.localeCompare(b.name));
-            const sortedTypes = [...window.state.types].sort((a, b) => a.name.localeCompare(b.name));
-            const sortedAttendants = [...window.state.attendants].sort((a, b) => a.name.localeCompare(b.name));
+            
+            const selectedLoc = window.state.locations.find(l => l.id === locVal);
+            const selectedType = window.state.types.find(t => t.id === typeVal);
+            const selectedAtt = window.state.attendants.find(a => a.id === attVal);
+
             const div = document.createElement('div'); 
             div.className = "flex flex-col h-screen bg-slate-100"; 
             div.id = "event-form-container";
@@ -667,24 +697,24 @@
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-slate-700 mb-1">Local <span class="text-red-500">*</span></label>
-                            <select id="evtLoc" class="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-navy/20 transition-all">
-                                <option value="">Selecione...</option>
-                                ${sortedLocations.map(l => `<option value="${l.id}" ${l.id === (event?.locationId || '') ? 'selected' : ''}>${l.name}</option>`).join('')}
-                            </select>
+                            <button type="button" onclick="window.openSelectPicker('locations', 'Localidade', 'formTempLoc')" class="w-full p-3 border border-slate-300 rounded-lg text-left text-slate-800 bg-white flex items-center justify-between transition-colors">
+                                <span class="truncate">${selectedLoc?.name || 'Selecione...'}</span>
+                                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+                            </button>
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-slate-700 mb-1">Tipo de Evento <span class="text-red-500">*</span></label>
-                            <select id="evtType" class="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-navy/20 transition-all">
-                                <option value="">Selecione...</option>
-                                ${sortedTypes.map(t => `<option value="${t.id}" ${t.id === (event?.typeId || '') ? 'selected' : ''}>${t.name}</option>`).join('')}
-                            </select>
+                            <button type="button" onclick="window.openSelectPicker('types', 'Tipo de Evento', 'formTempType')" class="w-full p-3 border border-slate-300 rounded-lg text-left text-slate-800 bg-white flex items-center justify-between transition-colors">
+                                <span class="truncate">${selectedType?.name || 'Selecione...'}</span>
+                                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+                            </button>
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-slate-700 mb-1">Atendente <span class="text-xs font-normal text-slate-400">(Opcional)</span></label>
-                            <select id="evtAtt" class="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-navy/20">
-                                <option value="">Selecione...</option>
-                                ${sortedAttendants.map(a => `<option value="${a.id}" ${a.id === (event?.attendantId || '') ? 'selected' : ''}>${a.name}</option>`).join('')}
-                            </select>
+                            <button type="button" onclick="window.openSelectPicker('attendants', 'Atendente', 'formTempAtt')" class="w-full p-3 border border-slate-300 rounded-lg text-left text-slate-800 bg-white flex items-center justify-between transition-colors">
+                                <span class="truncate">${selectedAtt?.name || 'Selecione...'}</span>
+                                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+                            </button>
                         </div>
                         <div class="pt-4 flex flex-col gap-3 border-t mt-2">
                             ${window.state.isAdmin ? `<button type="button" onclick="window.saveEvent()" class="w-full py-3 bg-navy text-white rounded-lg font-bold shadow-lg shadow-blue-900/20 hover:bg-navy-dark flex items-center justify-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Salvar Evento</button>` : ''}
@@ -774,14 +804,70 @@
          * 9. LOGICA DE NEGÓCIO (SALVAR, FILTRAR, EXCLUIR)
          * ==========================================
          */
+
+        window.openSelectPicker = (collectionKey, title, targetStateKey, isFilter = false) => {
+            const items = [...window.state[collectionKey]].sort((a, b) => a.name.localeCompare(b.name));
+            const currentId = isFilter ? window.state.tempAdvFilter[targetStateKey] : window.state[targetStateKey];
+
+            window.showModal(`
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm flex flex-col max-h-[80vh] overflow-hidden">
+                    <div class="p-4 border-b bg-slate-50 flex justify-between items-center flex-shrink-0">
+                        <h3 class="font-bold text-navy flex items-center gap-2"><i data-lucide="list"></i> Selecionar ${title}</h3>
+                        <button onclick="window.closeModal()"><i data-lucide="x" class="w-6 h-6 text-slate-400"></i></button>
+                    </div>
+                    <div class="p-2 border-b bg-white">
+                        <div class="relative">
+                            <input type="text" id="pickerSearch" placeholder="Filtrar..." class="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-navy/20">
+                            <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-slate-400"></i>
+                        </div>
+                    </div>
+                    <div id="picker-list" class="flex-1 overflow-y-auto p-2">
+                        ${items.map(item => `
+                            <button onclick="window.confirmSelectPicker('${targetStateKey}', '${item.id}', ${isFilter})" 
+                                    class="w-full text-left p-3 rounded-lg mb-1 flex items-center justify-between transition-colors ${currentId === item.id ? 'bg-blue-50 text-navy font-bold border border-blue-100' : 'hover:bg-slate-50 text-slate-600'}">
+                                <span>${item.name} ${item.sigla ? `<span class="text-[10px] bg-slate-200 px-1 rounded ml-1 font-bold">${item.sigla}</span>` : ''}</span>
+                                ${currentId === item.id ? '<i data-lucide="check" class="w-4 h-4 text-navy"></i>' : ''}
+                            </button>
+                        `).join('')}
+                        ${!isFilter && targetStateKey === 'formTempAtt' ? `
+                            <button onclick="window.confirmSelectPicker('${targetStateKey}', '', false)" class="w-full text-left p-3 rounded-lg mb-1 text-slate-400 italic hover:bg-slate-50">Nenhum (Limpar)</button>
+                        ` : ''}
+                        ${isFilter ? `<button onclick="window.confirmSelectPicker('${targetStateKey}', '', true)" class="w-full text-left p-3 rounded-lg mb-1 text-slate-400 italic hover:bg-slate-50">Todos (Limpar)</button>` : ''}
+                    </div>
+                </div>
+            `);
+
+            const sInput = document.getElementById('pickerSearch');
+            sInput.oninput = (e) => {
+                const val = e.target.value.toLowerCase();
+                document.querySelectorAll('#picker-list button').forEach(btn => {
+                    const text = btn.innerText.toLowerCase();
+                    btn.classList.toggle('hidden', !text.includes(val));
+                });
+            };
+        };
+
+        window.confirmSelectPicker = (key, id, isFilter) => {
+            if (isFilter) {
+                window.updateAdvFilterState(key, id);
+                window.openAdvancedFilterModal(true);
+            } else {
+                window.state[key] = id;
+                window.closeModal();
+            }
+        };
+
         window.saveEvent = async () => { 
             const date = window.state.formTempDate;
             const time = window.state.formTempTime;
-            const locationId = document.getElementById('evtLoc')?.value || '';
-            const typeId = document.getElementById('evtType')?.value || '';
-            const attendantId = document.getElementById('evtAtt')?.value || "";
+            const locationId = window.state.formTempLoc;
+            const typeId = window.state.formTempType;
+            const attendantId = window.state.formTempAtt;
             
-            if (!date || !time || !locationId || !typeId) return;
+            if (!date || !time || !locationId || !typeId) {
+                alert("Preencha todos os campos obrigatórios.");
+                return;
+            }
 
             const duplicate = window.state.events.find(ev => 
                 ev.id !== window.state.editingEventId && ev.date === date && ev.time === time && ev.locationId === locationId && ev.typeId === typeId && ev.attendantId === attendantId
@@ -818,11 +904,35 @@
         };
 
         window.saveGenericRow = async (id, hasSigla) => {
+            const nameInput = document.getElementById('editNameInput');
+            const siglaInput = document.getElementById('editSiglaInput');
+            const extraInput = document.getElementById('editExtraInput');
+            
             const name = window.state.tempName.trim();
             const sigla = window.state.tempSigla.trim();
-            if (!name) return alert("O nome é obrigatório.");
+            const extra = (window.state.tempExtra || '').trim();
             
+            let hasValidationError = false;
+            if (nameInput) nameInput.classList.remove('input-error');
+            if (siglaInput) siglaInput.classList.remove('input-error');
+            if (extraInput) extraInput.classList.remove('input-error');
+
+            if (!name) { 
+                if(nameInput) nameInput.classList.add('input-error'); 
+                hasValidationError = true; 
+            }
+            if (hasSigla && !sigla) { 
+                if(siglaInput) siglaInput.classList.add('input-error'); 
+                hasValidationError = true; 
+            }
             const collKey = window.getCollectionKeyByScreen(window.state.currentScreen);
+            if ((collKey === 'locations' || collKey === 'attendants') && !extra) {
+                if(extraInput) extraInput.classList.add('input-error');
+                hasValidationError = true;
+            }
+
+            if (hasValidationError) return;
+            
             const items = window.state[collKey];
 
             const duplicate = items.find(i => {
@@ -850,6 +960,8 @@
 
             const payload = { name };
             if (hasSigla) payload.sigla = sigla.toUpperCase();
+            if (collKey === 'locations') payload.Cidade = extra;
+            if (collKey === 'attendants') payload.Ministério = extra;
             
             try {
                 if (id) await db.collection(collKey).doc(id).update(payload);
@@ -866,7 +978,8 @@
         window.getCollectionKeyByScreen = (s) => (s === 'types' ? 'types' : s === 'locations' ? 'locations' : s === 'attendants' ? 'attendants' : '');
         window.startCreateRow = () => { 
             window.state.highlightedId = null;
-            window.state.isCreatingRow = true; window.state.editingRowId = null; window.state.tempName = ''; window.state.tempSigla = ''; 
+            window.state.isCreatingRow = true; window.state.editingRowId = null; 
+            window.state.tempName = ''; window.state.tempSigla = ''; window.state.tempExtra = '';
             const titleMap = { types: 'Tipo de Evento', locations: 'Localidade', attendants: 'Atendente' };
             window.showModal(renderInlineRow(null, titleMap[window.getCollectionKeyByScreen(window.state.currentScreen)], window.state.currentScreen === 'types', true));
         };
@@ -875,12 +988,19 @@
             const key = window.getCollectionKeyByScreen(window.state.currentScreen);
             const item = window.state[key].find(i => i.id === id);
             if(item) { 
-                window.state.isCreatingRow = false; window.state.editingRowId = id; window.state.tempName = item.name; window.state.tempSigla = item.sigla || ''; 
+                window.state.isCreatingRow = false; window.state.editingRowId = id; 
+                window.state.tempName = item.name; 
+                window.state.tempSigla = item.sigla || '';
+                window.state.tempExtra = (item.Cidade || item.Ministério || '');
                 const titleMap = { types: 'Tipo de Evento', locations: 'Localidade', attendants: 'Atendente' };
                 window.showModal(renderInlineRow(item, titleMap[key], window.state.currentScreen === 'types', false));
             }
         };
-        window.cancelGenericEdit = () => { window.state.isCreatingRow = false; window.state.editingRowId = null; window.closeModal(); };
+        window.cancelGenericEdit = () => { 
+            window.state.isCreatingRow = false; window.state.editingRowId = null; 
+            window.state.tempExtra = '';
+            window.closeModal(); 
+        };
 
         /**
          * ==========================================
@@ -891,7 +1011,18 @@
         window.resetAllFilters = () => { 
             window.state.searchTerm = ''; window.state.selectedDate = null; window.state.filterStartDate = ''; window.state.filterEndDate = ''; window.state.fastFilterLabel = ''; window.state.advancedFilter = { ...defaultAdvancedFilter, active: false }; window.state.isViewAll = true; 
         };
-        window.openEditEvent = (id) => { const e = window.state.events.find(ev => ev.id === id); if(e) { window.state.editingEventId = id; window.state.formTempDate = e.date; window.state.formTempTime = e.time; window.navigateTo('event-form'); } };
+        window.openEditEvent = (id) => { 
+            const e = window.state.events.find(ev => ev.id === id); 
+            if(e) { 
+                window.state.editingEventId = id; 
+                window.state.formTempDate = e.date; 
+                window.state.formTempTime = e.time; 
+                window.state.formTempLoc = e.locationId;
+                window.state.formTempType = e.typeId;
+                window.state.formTempAtt = e.attendantId || '';
+                window.navigateTo('event-form'); 
+            } 
+        };
         window.openAgendaModal = () => {
             const year = window.state.viewDate.getFullYear(); const month = window.state.viewDate.getMonth(); const daysInMonth = new Date(year, month + 1, 0).getDate(); const firstDay = new Date(year, month, 1).getDay();
             let calendarHtml = '';
@@ -984,12 +1115,15 @@
         window.openAdvancedFilterModal = (restore = false) => {
             if (!restore) window.state.tempAdvFilter = { ...defaultAdvancedFilter };
             const src = window.state.tempAdvFilter;
-            const typeOpts = `<option value="">Selecione...</option>` + window.state.types.sort((a,b)=>a.name.localeCompare(b.name)).map(t => `<option value="${t.id}" ${t.id === src.valType ? 'selected' : ''}>${t.name}</option>`).join('');
-            const sigOpts = `<option value="">Selecione...</option>` + window.state.types.filter(t=>t.sigla).sort((a,b)=>a.sigla.localeCompare(b.sigla)).map(t => `<option value="${t.id}" ${t.id === src.valSigla ? 'selected' : ''}>${t.sigla}</option>`).join('');
-            const locOpts = `<option value="">Selecione...</option>` + window.state.locations.sort((a,b)=>a.name.localeCompare(b.name)).map(l => `<option value="${l.id}" ${l.id === src.valLoc ? 'selected' : ''}>${l.name}</option>`).join('');
-            const attOpts = `<option value="">Selecione...</option>` + window.state.attendants.sort((a,b)=>a.name.localeCompare(b.name)).map(a => `<option value="${a.id}" ${a.id === src.valAtt ? 'selected' : ''}>${a.name}</option>`).join('');
-            const dsDisp = src.dateStart ? formatDateFull(src.dateStart) : 'Selecione...'; const deDisp = src.dateEnd ? formatDateFull(src.dateEnd) : 'Selecione...';
-            window.showModal(`<div id="advanced-filter-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-md p-0 overflow-hidden flex flex-col max-h-[90vh]"><div class="p-3 border-b border-slate-100 flex justify-between items-center bg-navy text-white"><h3 class="font-bold text-base flex items-center gap-2"><i data-lucide="filter" class="w-4 h-4"></i> Informe os dados para Filtrar</h3><button onclick="window.closeModal()"><i data-lucide="x" class="w-5 h-5"></i></button></div><div class="p-3 overflow-y-auto flex-1 flex flex-col gap-2 bg-slate-50"><div class="bg-white p-2 rounded shadow-sm border border-slate-200"><div class="flex items-center justify-between mb-1"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase cursor-pointer"><input type="checkbox" ${src.useStatus?'checked':''} onchange="window.updateAdvFilterState('useStatus', this.checked); window.openAdvancedFilterModal(true)"> Status</label><div class="flex gap-3 ${!src.useStatus?'opacity-50 pointer-events-none':''}"> <label class="text-xs font-medium"><input type="radio" name="adv_st" value="active" ${src.statusVal==='active'?'checked':''} onchange="window.updateAdvFilterState('statusVal', 'active')"> Ativos</label> <label class="text-xs font-medium"><input type="radio" name="adv_st" value="inactive" ${src.statusVal==='inactive'?'checked':''} onchange="window.updateAdvFilterState('statusVal', 'inactive')"> Inativos</label></div></div></div><div class="bg-white p-2 rounded shadow-sm border border-slate-200"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase mb-2 cursor-pointer"><input type="checkbox" ${src.useGroupType?'checked':''} onchange="window.updateAdvFilterState('useGroupType', this.checked); window.openAdvancedFilterModal(true)"> Tipo/Sigla</label><div class="flex flex-col gap-2 ${!src.useGroupType?'opacity-50 pointer-events-none':''}"><div class="flex gap-4"> <label class="text-xs font-medium"><input type="radio" name="adv_tp" value="type" ${src.selectedRadio==='type'?'checked':''} onchange="window.updateAdvFilterState('selectedRadio', 'type'); window.openAdvancedFilterModal(true)"> Nome</label> <label class="text-xs font-medium"><input type="radio" name="adv_tp" value="sigla" ${src.selectedRadio==='sigla'?'checked':''} onchange="window.updateAdvFilterState('selectedRadio', 'sigla'); window.openAdvancedFilterModal(true)"> Sigla</label></div><select class="w-full p-1.5 border rounded text-xs bg-white" onchange="window.updateAdvFilterState(window.state.tempAdvFilter.selectedRadio==='type'?'valType':'valSigla', this.value)">${src.selectedRadio==='type'?typeOpts:sigOpts}</select></div></div><div class="grid grid-cols-2 gap-2"><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-[10px] uppercase mb-1"><input type="checkbox" ${src.useLoc?'checked':''} onchange="window.updateAdvFilterState('useLoc', this.checked); window.openAdvancedFilterModal(true)"> Local</label><select class="w-full p-1 border rounded text-[10px] bg-white ${!src.useLoc?'opacity-50 pointer-events-none':''}" onchange="window.updateAdvFilterState('valLoc', this.value)">${locOpts}</select></div><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-[10px] uppercase mb-1"><input type="checkbox" ${src.useAtt?'checked':''} onchange="window.updateAdvFilterState('useAtt', this.checked); window.openAdvancedFilterModal(true)"> Atendente</label><select class="w-full p-1 border rounded text-[10px] bg-white ${!src.useAtt?'opacity-50 pointer-events-none':''}" onchange="window.updateAdvFilterState('valAtt', this.value)">${attOpts}</select></div></div><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase mb-2 cursor-pointer"><input type="checkbox" ${src.useDate?'checked':''} onchange="window.updateAdvFilterState('useDate', this.checked); window.openAdvancedFilterModal(true)"> Datas</label><div class="grid grid-cols-2 gap-2 ${!src.useDate?'opacity-50 pointer-events-none':''}"><button onclick="window.openFilterDate('adv_dateStart')" class="p-1.5 border rounded text-xs bg-white text-left truncate">${dsDisp}</button><button onclick="window.openFilterDate('adv_dateEnd')" class="p-1.5 border rounded text-xs bg-white text-left truncate">${deDisp}</button></div></div></div><div class="p-3 bg-white border-t flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-2 bg-slate-100 text-slate-600 rounded font-bold text-sm">Cancelar</button><button onclick="window.applyAdvancedFilter()" class="flex-1 py-2 bg-navy text-white rounded font-bold text-sm shadow">Filtrar</button></div></div>`);
+            
+            const selLoc = window.state.locations.find(l => l.id === src.valLoc);
+            const selAtt = window.state.attendants.find(a => a.id === src.valAtt);
+            const selType = window.state.types.find(t => t.id === (src.selectedRadio === 'type' ? src.valType : src.valSigla));
+            
+            const dsDisp = src.dateStart ? formatDateFull(src.dateStart) : 'Selecione...'; 
+            const deDisp = src.dateEnd ? formatDateFull(src.dateEnd) : 'Selecione...';
+
+            window.showModal(`<div id="advanced-filter-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-md p-0 overflow-hidden flex flex-col max-h-[90vh]"><div class="p-3 border-b border-slate-100 flex justify-between items-center bg-navy text-white"><h3 class="font-bold text-base flex items-center gap-2"><i data-lucide="filter" class="w-4 h-4"></i> Informe os dados para Filtrar</h3><button onclick="window.closeModal()"><i data-lucide="x" class="w-5 h-5"></i></button></div><div class="p-3 overflow-y-auto flex-1 flex flex-col gap-2 bg-slate-50"><div class="bg-white p-2 rounded shadow-sm border border-slate-200"><div class="flex items-center justify-between mb-1"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase cursor-pointer"><input type="checkbox" ${src.useStatus?'checked':''} onchange="window.updateAdvFilterState('useStatus', this.checked); window.openAdvancedFilterModal(true)"> Status</label><div class="flex gap-3 ${!src.useStatus?'opacity-50 pointer-events-none':''}"> <label class="text-xs font-medium"><input type="radio" name="adv_st" value="active" ${src.statusVal==='active'?'checked':''} onchange="window.updateAdvFilterState('statusVal', 'active')"> Ativos</label> <label class="text-xs font-medium"><input type="radio" name="adv_st" value="inactive" ${src.statusVal==='inactive'?'checked':''} onchange="window.updateAdvFilterState('statusVal', 'inactive')"> Inativos</label></div></div></div><div class="bg-white p-2 rounded shadow-sm border border-slate-200"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase mb-2 cursor-pointer"><input type="checkbox" ${src.useGroupType?'checked':''} onchange="window.updateAdvFilterState('useGroupType', this.checked); window.openAdvancedFilterModal(true)"> Tipo/Sigla</label><div class="flex flex-col gap-2 ${!src.useGroupType?'opacity-50 pointer-events-none':''}"><div class="flex gap-4"> <label class="text-xs font-medium"><input type="radio" name="adv_tp" value="type" ${src.selectedRadio==='type'?'checked':''} onchange="window.updateAdvFilterState('selectedRadio', 'type'); window.openAdvancedFilterModal(true)"> Nome</label> <label class="text-xs font-medium"><input type="radio" name="adv_tp" value="sigla" ${src.selectedRadio==='sigla'?'checked':''} onchange="window.updateAdvFilterState('selectedRadio', 'sigla'); window.openAdvancedFilterModal(true)"> Sigla</label></div><button type="button" onclick="window.openSelectPicker('types', window.state.tempAdvFilter.selectedRadio==='type'?'Tipo':'Sigla', window.state.tempAdvFilter.selectedRadio==='type'?'valType':'valSigla', true)" class="w-full p-2 border rounded text-xs bg-white text-left flex justify-between items-center"><span class="truncate">${(src.selectedRadio === 'type' ? selType?.name : selType?.sigla) || 'Selecione...'}</span><i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i></button></div></div><div class="grid grid-cols-2 gap-2"><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-[10px] uppercase mb-1"><input type="checkbox" ${src.useLoc?'checked':''} onchange="window.updateAdvFilterState('useLoc', this.checked); window.openAdvancedFilterModal(true)"> Local</label><button type="button" onclick="window.openSelectPicker('locations', 'Local', 'valLoc', true)" class="w-full p-1.5 border rounded text-[10px] bg-white text-left flex justify-between items-center ${!src.useLoc?'opacity-50 pointer-events-none':''}"><span class="truncate">${selLoc?.name || 'Selecione...'}</span><i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i></button></div><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-[10px] uppercase mb-1"><input type="checkbox" ${src.useAtt?'checked':''} onchange="window.updateAdvFilterState('useAtt', this.checked); window.openAdvancedFilterModal(true)"> Atendente</label><button type="button" onclick="window.openSelectPicker('attendants', 'Atendente', 'valAtt', true)" class="w-full p-1.5 border rounded text-[10px] bg-white text-left flex justify-between items-center ${!src.useAtt?'opacity-50 pointer-events-none':''}"><span class="truncate">${selAtt?.name || 'Selecione...'}</span><i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i></button></div></div><div class="bg-white p-2 rounded border"><label class="flex items-center gap-2 font-bold text-navy text-xs uppercase mb-2 cursor-pointer"><input type="checkbox" ${src.useDate?'checked':''} onchange="window.updateAdvFilterState('useDate', this.checked); window.openAdvancedFilterModal(true)"> Datas</label><div class="grid grid-cols-2 gap-2 ${!src.useDate?'opacity-50 pointer-events-none':''}"><button onclick="window.openFilterDate('adv_dateStart')" class="p-1.5 border rounded text-xs bg-white text-left truncate">${dsDisp}</button><button onclick="window.openFilterDate('adv_dateEnd')" class="p-1.5 border rounded text-xs bg-white text-left truncate">${deDisp}</button></div></div></div><div class="p-3 bg-white border-t flex gap-3"><button onclick="window.closeModal()" class="flex-1 py-2 bg-slate-100 text-slate-600 rounded font-bold text-sm">Cancelar</button><button onclick="window.applyAdvancedFilter()" class="flex-1 py-2 bg-navy text-white rounded font-bold text-sm shadow">Filtrar</button></div></div>`);
         };
         window.updateAdvFilterState = (f, v) => { if (!window.state.tempAdvFilter) window.state.tempAdvFilter = { ...window.state.advancedFilter }; window.state.tempAdvFilter[f] = v; };
         window.applyAdvancedFilter = () => { 
@@ -1047,7 +1181,15 @@
             app.innerHTML = `<div class="flex flex-col h-screen bg-slate-100"><div class="bg-navy text-white p-4 flex items-center gap-3 shadow-lg z-10 shrink-0"><button onclick="window.navigateTo('home')" class="hover:bg-white/10 p-1 rounded-full"><i data-lucide="arrow-left"></i></button><h1 class="font-bold uppercase tracking-wide">Sobre o App</h1></div><div class="p-6 flex flex-col gap-6 text-slate-600 max-w-lg mx-auto overflow-y-auto pb-10"><div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-2 text-navy shadow-lg border border-slate-200 shrink-0"><i data-lucide="calendar-check-2" class="w-10 h-10"></i></div><div class="text-center"><h2 class="text-2xl font-black text-navy mb-1">Eventos Adm Valente</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Gerenciador de Agenda Administrativa</p></div><div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200"><h3 class="font-bold text-navy mb-3 flex items-center gap-2"><i data-lucide="zap" class="w-4 h-4 text-orange-custom"></i> Funcionalidades</h3><ul class="text-xs sm:text-sm space-y-3 text-slate-600"> <li class="flex items-start gap-3"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Gestão completa de eventos com categorias, localidades e atendentes.</span></li> <li class="flex items-start gap-3"><i data-lucide="calendar" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Agenda interativa com visualização mensal e diária.</span></li> <li class="flex items-start gap-3"><i data-lucide="filter" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Filtros avançados para buscas precisas por múltiplos critérios.</span></li> <li class="flex items-start gap-3"><i data-lucide="file-text" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Exportação de relatórios profissionais em formatos PDF e PNG.</span></li> <li class="flex items-start gap-3"><i data-lucide="shield-check" class="w-4 h-4 text-green-500 mt-0.5 shrink-0"></i> <span>Segurança avançada com controle administrativo autenticado.</span></li></ul></div><div class="bg-blue-50 p-5 rounded-2xl border border-blue-100 text-center"><p class="text-lg font-medium text-slate-700">Sistema idealizado e desenvolvido por:</p><p class="text-sm font-black text-navy mt-1">Marcos de Lima</p></div><div class="text-center pt-4"><p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Versão 2.2.0</p></div></div></div>`; 
         }
 
-        window.startCreateEvent = () => { window.state.editingEventId = null; window.state.formTempDate = new Date().toISOString().split('T')[0]; window.state.formTempTime = '08:00'; window.navigateTo('event-form'); };
+        window.startCreateEvent = () => { 
+            window.state.editingEventId = null; 
+            window.state.formTempDate = new Date().toISOString().split('T')[0]; 
+            window.state.formTempTime = '08:00'; 
+            window.state.formTempLoc = '';
+            window.state.formTempType = '';
+            window.state.formTempAtt = '';
+            window.navigateTo('event-form'); 
+        };
         window.addEventListener('popstate', (event) => {
             if (window.state.isMenuOpen) { window.state.isMenuOpen = false; return; }
             const modal = document.getElementById('modal-container');
@@ -1099,72 +1241,6 @@
             `);
             document.getElementById('locate-dup-btn').onclick = () => { onLocate(); window.closeModal(); };
             document.getElementById('back-to-edit-btn').onclick = () => { onBackToEdit(); };
-        };
-
-        window.saveEvent = async () => { 
-            const date = window.state.formTempDate;
-            const time = window.state.formTempTime;
-            const locationId = document.getElementById('evtLoc')?.value || '';
-            const typeId = document.getElementById('evtType')?.value || '';
-            const attendantId = document.getElementById('evtAtt')?.value || "";
-            if (!date || !time || !locationId || !typeId) return;
-
-            const duplicate = window.state.events.find(ev => 
-                ev.id !== window.state.editingEventId && ev.date === date && ev.time === time && ev.locationId === locationId && ev.typeId === typeId && ev.attendantId === attendantId
-            );
-            if (duplicate) {
-                window.showDuplicateWarning("Já existe um evento idêntico agendado para este horário e local.", () => {
-                    window.resetAllFilters(); window.state.selectedDate = duplicate.date; window.navigateTo('home');
-                }, () => { window.closeModal(); });
-                return;
-            }
-            try { 
-                const payload = { date, time, locationId, typeId, attendantId };
-                if (window.state.editingEventId) await db.collection("agenda").doc(window.state.editingEventId).update(payload);
-                else await db.collection("agenda").add(payload);
-                window.state.editingEventId = null; window.resetAllFilters(); window.navigateTo('home'); 
-            } catch(e) { alert('Erro ao salvar.'); }
-        };
-
-        window.saveGenericRow = async (id, hasSigla) => {
-            const name = window.state.tempName.trim();
-            const sigla = window.state.tempSigla.trim();
-            if (!name) return alert("O nome é obrigatório.");
-            
-            const collKey = window.getCollectionKeyByScreen(window.state.currentScreen);
-            const items = window.state[collKey];
-
-            const duplicate = items.find(i => {
-                if (i.id === id) return false;
-                const nameMatch = i.name.toLowerCase() === name.toLowerCase();
-                const siglaMatch = hasSigla && i.sigla && i.sigla.toLowerCase() === sigla.toLowerCase();
-                return nameMatch || siglaMatch;
-            });
-
-            if (duplicate) {
-                const isNameDup = duplicate.name.toLowerCase() === name.toLowerCase();
-                const msg = isNameDup ? `Já existe um registro com o nome "${name}".` : `A sigla "${sigla}" já está em uso por "${duplicate.name}".`;
-                
-                window.showDuplicateWarning(msg, () => {
-                    window.state.managerSearchTerm = '';
-                    window.state.highlightedId = duplicate.id;
-                }, () => {
-                    const titleMap = { types: 'Tipo de Evento', locations: 'Localidade', attendants: 'Atendente' };
-                    const isNew = !id;
-                    const currentItem = isNew ? null : items.find(i => i.id === id);
-                    window.showModal(renderInlineRow(currentItem, titleMap[collKey], hasSigla, isNew));
-                });
-                return;
-            }
-
-            const payload = { name };
-            if (hasSigla) payload.sigla = sigla.toUpperCase();
-            
-            try {
-                if (id) await db.collection(collKey).doc(id).update(payload);
-                else await db.collection(collKey).add(payload);
-                window.cancelGenericEdit();
-            } catch (err) { alert("Erro ao salvar: " + err.message); }
         };
 
     </script>
